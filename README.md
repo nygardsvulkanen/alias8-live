@@ -1,6 +1,6 @@
 # Alias8 – Ableton Live script for the Livid Alias 8
 
-**Work in progress.** Banks 1–3, the buttons, lights and encoder scrolling are written and tested against a simulated Live; encoder scrolling is confirmed on a real Alias 8. Still to come: zero configuration (today the Alias 8 must be set up with the Livid editor's wizard). See `PLAN.md`.
+**Work in progress.** Banks 1–3, the buttons, lights and encoder scrolling are written and tested against a simulated Live; encoder scrolling is confirmed on a real Alias 8. Zero configuration (works on a factory-reset Alias 8) is written and waiting for a hardware test. See `PLAN.md`.
 
 A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller: track colours on the buttons, select, arm, mute, solo, volume, sends, pan and the selected track's rack macros. No editor setup needed, no naming rules for tracks or racks.
 
@@ -31,7 +31,7 @@ Track colours are rounded to the nearest of the Alias 8's seven colours (red, gr
 1. Download the `Alias8` folder and copy it into `~/Music/Ableton/User Library/Remote Scripts/` (Windows: `Documents\Ableton\User Library\Remote Scripts\`).
 2. Restart Live, open **Settings → Link, Tempo & MIDI**, and pick **Control Surface: Alias8**, **Input: Alias 8**, **Output: Alias 8**.
 
-Works with the Alias 8's factory settings. When Live starts, the script sends the controller the few settings it needs (Live controls the button lights; the colour map) – temporarily, nothing is saved, so the Alias 8 is back to normal when you unplug it.
+Works with the Alias 8's factory settings. When Live starts, the script asks the controller for two settings and changes them if needed: the colour map (so track colours come out right) and the encoder press (so it can switch to scroll mode). Nothing is saved in the controller, and the script puts the original values back when it stops, so the Alias 8 is left as it was.
 
 ## License
 

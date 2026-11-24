@@ -280,6 +280,55 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(p.feed(0.0, 0, 127, 10), 10.0)
         self.assertIsNone(p.feed(100.0, 0, 127, 11))       # someone moved it to 100: wait for the knob
 
+    # ---------------------------------------------------------------- controller setup
+    def test_asks_for_the_settings_it_needs(self):
+        s, song, tracks, mod = make()
+        self.assertIn((240, 0, 1, 97, 11, 7, 34, 247), s.midi_out)
+        self.assertIn((240, 0, 1, 97, 11, 7, 17, 247), s.midi_out)
+
+    def test_factory_controller_gets_colour_map_and_encoder_press(self):
+        s, song, tracks, mod = make()
+        s.midi_out = []
+        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # factory answers
+        s.handle_sysex((240, 0, 1, 97, 11, 17, 0, 0, 247))
+        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
+        self.assertIn((240, 0, 1, 97, 11, 17, 2, 0, 247), s.midi_out)
+        s.midi_out = []
+        s.disconnect()                                                         # put them back
+        self.assertIn((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247), s.midi_out)
+        self.assertIn((240, 0, 1, 97, 11, 17, 0, 0, 247), s.midi_out)
+
+    def test_already_set_up_controller_is_left_alone(self):
+        s, song, tracks, mod = make()
+        s.midi_out = []
+        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247))   # set up by the editor wizard
+        s.handle_sysex((240, 0, 1, 97, 11, 17, 3, 0, 247))                     # other bits are kept
+        self.assertEqual(s.midi_out, [])
+        s.disconnect()
+        self.assertFalse([m for m in s.midi_out if m[:5] == (240, 0, 1, 97, 11)])
+
+    def test_keeps_other_encoder_style_bits(self):
+        s, song, tracks, mod = make()
+        s.midi_out = []
+        s.handle_sysex((240, 0, 1, 97, 11, 17, 1, 5, 247))
+        self.assertIn((240, 0, 1, 97, 11, 17, 3, 5, 247), s.midi_out)
+
+    def test_no_answer_assumes_factory(self):
+        s, song, tracks, mod = make()
+        s.midi_out = []
+        for _ in range(25):
+            s.update_display()
+        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
+        self.assertIn((240, 0, 1, 97, 11, 17, 2, 0, 247), s.midi_out)
+
+    def test_later_settings_messages_are_ignored(self):
+        s, song, tracks, mod = make()
+        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247))
+        s.handle_sysex((240, 0, 1, 97, 11, 17, 2, 0, 247))
+        s.midi_out = []
+        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # e.g. the editor reading it later
+        self.assertEqual(s.midi_out, [])
+
     def test_disconnect_turns_lights_off(self):
         s, song, tracks, mod = make()
         s.disconnect()

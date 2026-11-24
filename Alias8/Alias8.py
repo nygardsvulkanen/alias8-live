@@ -26,6 +26,7 @@ from _Framework.MixerComponent import MixerComponent
 
 from .colors import OFF, nearest_color, top_led, bottom_led
 from .macros import first_rack, macro_param, Pickup
+from . import controller
 from .settings import (HOLD_SECONDS, BANK1_SENDS, BANK2_SEND, MACRO_PICKUP, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, SCROLL_STEP, NUM_TRACKS,
                        BANK_CHANNELS, KNOB_TOP_CC, KNOB_BOTTOM_CC, FADER_CC, MASTER_CC, BUTTON_TOP_NOTE,
                        BUTTON_BOTTOM_NOTE, ENCODER_CC)
@@ -35,6 +36,7 @@ MACRO_BANK = 2                                 # bank 3 (0-based): the rack macr
 BANK_SYSEX = (240, 0, 1, 97, 11, 113)          # the Alias 8 reports a bank change: + <bank> 247
 SET_BANK_SYSEX = (240, 0, 1, 97, 11, 26)       # tell the Alias 8 which bank to show: + <bank> 247
 BLINK_TICKS = 4                                # update_display runs about every 100 ms: blink at ~1.25 Hz
+SETUP_TIMEOUT_TICKS = 20                       # ~2 s: no answer from the Alias 8 = assume factory settings
 
 
 def decode_relative(value):
@@ -59,6 +61,8 @@ class Alias8(ControlSurface):
         self._tick = 0
         self._last_selected = None   # the selected track last time we looked (the box follows changes only)
         self._pickups = {}           # macro knob (row, column) -> (parameter, Pickup)
+        self._awaiting = {}          # Alias 8 setting -> ticks left to wait for its answer
+        self._original = {}          # Alias 8 setting -> its value before we changed it (sent back on disconnect)
         with self.component_guard():
             self._create_controls()
             self._session = SessionComponent(NUM_TRACKS, 1)
@@ -71,7 +75,28 @@ class Alias8(ControlSurface):
 
     def _start(self):
         self._send_midi(SET_BANK_SYSEX + (0, 247))     # start on bank 1
+        for cmd in controller.SETTINGS:                # ask for the colour map and the encoder style
+            self._awaiting[cmd] = SETUP_TIMEOUT_TICKS
+            self._send_midi(controller.request(cmd))
         self._refresh_leds(force=True)
+
+    # ------------------------------------------------------------------ controller setup (temporary)
+    def _got_setting(self, cmd, current):
+        """The Alias 8 told us one of its settings: remember it and send ours if it differs."""
+        self._awaiting.pop(cmd, None)
+        want = controller.wanted(cmd, current)
+        if tuple(want) == tuple(current):
+            return
+        self._original.setdefault(cmd, tuple(current))
+        self._send_midi(controller.message(cmd, want))
+        if cmd == controller.COLOR_MAP:
+            self._refresh_leds(force=True)             # the same velocities now mean the right colours
+
+    def _check_setup(self):
+        for cmd in list(self._awaiting):
+            self._awaiting[cmd] -= 1
+            if self._awaiting[cmd] <= 0:               # no answer: assume factory settings
+                self._got_setting(cmd, controller.FACTORY[cmd])
 
     # ------------------------------------------------------------------ controls
     def _create_controls(self):
@@ -131,6 +156,11 @@ class Alias8(ControlSurface):
         if tuple(midi_bytes[:6]) == BANK_SYSEX and len(midi_bytes) == 8:
             self._set_bank(midi_bytes[6])
             return
+        msg = controller.parse(midi_bytes)
+        if msg is not None:
+            if msg[0] in self._awaiting:               # the answer to our question at start-up
+                self._got_setting(*msg)
+            return                                     # other settings (e.g. the Livid editor reading them): ignore
         ControlSurface.handle_sysex(self, midi_bytes)
 
     def _set_bank(self, bank):
@@ -315,12 +345,16 @@ class Alias8(ControlSurface):
     def update_display(self):
         ControlSurface.update_display(self)
         self._tick += 1
+        if self._awaiting:
+            self._check_setup()
         self._check_holds()
         if BOX_FOLLOWS_SELECTION:
             self._follow_selection()
         self._refresh_leds()
 
     def disconnect(self):
+        for cmd, data in self._original.items():       # leave the Alias 8 as we found it
+            self._send_midi(controller.message(cmd, data))
         for bank in range(NUM_BANKS):
             for i in range(NUM_TRACKS):
                 self._btn_top[bank][i].send_value(OFF, True)
