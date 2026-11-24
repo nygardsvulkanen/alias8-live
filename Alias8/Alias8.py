@@ -260,7 +260,7 @@ class Alias8(ControlSurface):
         try:
             tracks = list(self.song().visible_tracks)
             sel = self.song().view.selected_track
-            if sel is self._last_selected:
+            if sel == self._last_selected:             # == (not "is"): Live hands out a new wrapper on every read
                 return                                 # only a new selection moves the box (scrolling stays put)
             self._last_selected = sel
             if sel not in tracks:

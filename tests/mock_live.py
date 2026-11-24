@@ -33,10 +33,47 @@ class Device(object):
             self.macros_mapped = macros_mapped
 
 
+class Wrapper(object):
+    """Like Live's Python objects: a new wrapper on every read, equal (==) to the same track but not identical."""
+    def __init__(self, obj):
+        object.__setattr__(self, "_obj", obj)
+
+    def __getattr__(self, name):
+        return getattr(self._obj, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._obj, name, value)
+
+    def __eq__(self, other):
+        return self._obj is (other._obj if isinstance(other, Wrapper) else other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return id(self._obj)
+
+
+class View(object):
+    def __init__(self):
+        self._selected = None
+        self.wrap = True           # hand out a new wrapper on every read, as Live does
+
+    @property
+    def selected_track(self):
+        if self.wrap and self._selected is not None:
+            return Wrapper(self._selected)
+        return self._selected
+
+    @selected_track.setter
+    def selected_track(self, t):
+        self._selected = t._obj if isinstance(t, Wrapper) else t
+
+
 class Song(object):
     def __init__(self, tracks):
         self.visible_tracks = list(tracks)
-        self.view = types.SimpleNamespace(selected_track=None)
+        self.view = View()
 
 
 class Element(object):

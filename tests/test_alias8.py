@@ -62,7 +62,7 @@ class TestAlias8(unittest.TestCase):
         s, song, tracks, mod = make()
         Clock(mod)
         s._btn_top[0][2].receive(127)
-        self.assertIs(song.view.selected_track, tracks[2])
+        self.assertEqual(song.view.selected_track, tracks[2])
         s._btn_top[0][2].receive(0)
         self.assertFalse(tracks[2].arm)
 
@@ -136,7 +136,7 @@ class TestAlias8(unittest.TestCase):
         s, song, tracks, mod = make()
         s._btn_top[2][6].receive(127)
         self.assertEqual(s._bank, 2)
-        self.assertIs(song.view.selected_track, tracks[6])
+        self.assertEqual(song.view.selected_track, tracks[6])
 
     def test_unused_bank(self):
         s, song, tracks, mod = make()
@@ -148,7 +148,7 @@ class TestAlias8(unittest.TestCase):
         s, song, tracks, mod = make()
         s._session.set_offsets(2, 0)
         s._btn_top[0][0].receive(127)
-        self.assertIs(song.view.selected_track, tracks[2])
+        self.assertEqual(song.view.selected_track, tracks[2])
 
     def test_box_follows_selected_track(self):
         s, song, tracks, mod = make(n_tracks=20)
@@ -172,7 +172,7 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(s._session.track_offset(), 1)
         self.assertIn("tracks 2-9", s.messages[-1])
         s._btn_top[0][0].receive(127)
-        self.assertIs(song.view.selected_track, tracks[1])   # the columns follow the box
+        self.assertEqual(song.view.selected_track, tracks[1])   # the columns follow the box
 
     def test_encoder_stops_at_the_ends(self):
         s, song, tracks, mod = make(n_tracks=10)
@@ -190,6 +190,20 @@ class TestAlias8(unittest.TestCase):
             s._encoders[0].receive(1)
         s.update_display()
         self.assertEqual(s._session.track_offset(), 9)        # the selected track 1 is outside, the box stays
+
+    def test_scrolling_past_the_selected_track_with_live_wrappers(self):
+        # Live returns a new object for selected_track on every read: the box must not snap back to it
+        s, song, tracks, mod = make(n_tracks=20)
+        song.view.wrap = True
+        song.view.selected_track = tracks[0]
+        s.update_display()
+        offsets = []
+        for _ in range(9):
+            s._encoders[0].receive(1)
+            s.update_display()
+            s.update_display()
+            offsets.append(s._session.track_offset())
+        self.assertEqual(offsets, list(range(1, 10)))           # moved every click, never pulled back
 
     def test_decode_relative(self):
         from Alias8.Alias8 import decode_relative

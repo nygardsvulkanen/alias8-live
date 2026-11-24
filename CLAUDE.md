@@ -15,6 +15,7 @@ Owner: Daniel (writes in Swedish; answer in Swedish, keep code/comments/docs in 
 - Keep it small and generic: no naming conventions, no personal settings, no UDP/viewer code.
 - Buttons and faders must do the same on every bank (muscle memory); only knobs change.
 - Never save anything to the controller ("save to device"); connect-time sysex is temporary.
+- Compare Live objects (tracks, devices, parameters) with `==`, never `is`: Live hands out a new Python wrapper on every read. The fake Live (`tests/mock_live.py`) does the same for the selected track.
 - Every change: a line in `CHANGES.md`, commit.
 - Testing: `python3 -m unittest discover tests` (fake Live / `_Framework` in `tests/mock_live.py`) until Daniel tests on hardware. Add a test for every behaviour.
 - Layout: `Alias8/Alias8.py` (the script), `Alias8/colors.py` (pure colour logic), `Alias8/macros.py` (first rack, macros, pickup – pure), `Alias8/controller.py` (the temporary Alias 8 settings – pure), `Alias8/settings.py` (user settings + factory MIDI map).
