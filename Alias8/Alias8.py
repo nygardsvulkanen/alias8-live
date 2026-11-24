@@ -28,7 +28,7 @@ from _Framework.MixerComponent import MixerComponent
 from .colors import OFF, nearest_color, top_led, bottom_led
 from .macros import first_rack, macro_param, Pickup
 from . import controller
-from .settings import (HOLD_SECONDS, BANK1_SENDS, BANK2_SEND, MACRO_PICKUP, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, SCROLL_STEP, NUM_TRACKS,
+from .settings import (DEBUG, HOLD_SECONDS, BANK1_SENDS, BANK2_SEND, MACRO_PICKUP, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, SCROLL_STEP, NUM_TRACKS,
                        BANK_CHANNELS, KNOB_TOP_CC, KNOB_BOTTOM_CC, FADER_CC, MASTER_CC, BUTTON_TOP_NOTE,
                        BUTTON_BOTTOM_NOTE, ENCODER_CC)
 
@@ -94,6 +94,7 @@ class Alias8(ControlSurface):
         """The Alias 8 told us one of its settings. The encoder's are only read; the colour map is
         replaced (temporarily) if it differs from the script's."""
         self._awaiting.pop(cmd, None)
+        self._debug("Alias 8 setting %d = %s" % (cmd, tuple(current)))
         if cmd == controller.ENCODER_MAP:
             self._set_encoder_cc(controller.encoder_cc(current, ENCODER_CC))
             return
@@ -150,7 +151,13 @@ class Alias8(ControlSurface):
                 self._on_encoder(value)
         return cb
 
+    def _debug(self, text):
+        if DEBUG:
+            self.log_message("Alias8 debug: " + text)
+
     def _on_encoder(self, value):
+        self._debug("encoder CC %d value %d (%s), box at track %d" % (
+            self._enc_cc, value, "relative" if self._enc_relative else "absolute", self._session.track_offset() + 1))
         if self._enc_relative:
             steps = decode_relative(value)
         else:                                          # absolute: the direction it moved, one track per message
@@ -191,6 +198,8 @@ class Alias8(ControlSurface):
         if tuple(midi_bytes[:6]) == BANK_SYSEX and len(midi_bytes) == 8:
             self._set_bank(midi_bytes[6])
             return
+        if tuple(midi_bytes) == controller.ACK:
+            return                                     # the Alias 8 confirming our colour map
         msg = controller.parse(midi_bytes)
         if msg is not None:
             if msg[0] in self._awaiting:               # the answer to our question at start-up

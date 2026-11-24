@@ -8,6 +8,7 @@
 
 HEADER = (240, 0, 1, 97, 11)     # Livid (manufacturer 97), Alias 8 (product 11)
 REQUEST = 7                      # "request setting <cmd>"
+ACK = HEADER + (127, 247)        # the Alias 8 accepted a setting
 
 ENCODER_MAP = 16                 # per encoder slot: CC number, mode. Slot 0 = bank mode (CC 126), slot 1 = CC mode
 ENCODER_TYPE = 17                # bit n of byte 0: encoder slot n is relative (1) or absolute (0)

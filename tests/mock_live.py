@@ -169,6 +169,9 @@ class ControlSurface(object):
     def show_message(self, m):
         self.messages.append(m)
 
+    def log_message(self, m):
+        self.messages.append(m)
+
     def _send_midi(self, data):
         self.midi_out.append(tuple(data))
         LOG.append(("midi", tuple(data)))

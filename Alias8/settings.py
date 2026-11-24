@@ -29,6 +29,9 @@ SCROLL_STEP = 1
 # The selected track's button blinks (True) or just stays lit in its colour (False).
 SELECTED_BLINKS = True
 
+# Troubleshooting: True = write what the script sees (encoder, settings from the Alias 8) to Live's Log.txt.
+DEBUG = False
+
 
 # -----------------------------------------------------------------------------------------------------
 # Hardware – the Alias 8's factory layout. Only change these if you changed the controller in the

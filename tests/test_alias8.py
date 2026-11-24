@@ -401,6 +401,16 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(s.midi_out, [])
         self.assertTrue(s._enc_relative)
 
+    def test_ack_is_quiet(self):
+        s, song, tracks, mod = make()
+        s.midi_out = []
+        s.handle_sysex((240, 0, 1, 97, 11, 127, 247))
+        self.assertEqual(s.midi_out, [])
+
+    def test_debug_is_off_by_default(self):
+        from Alias8 import settings
+        self.assertFalse(settings.DEBUG)
+
     def test_disconnect_turns_lights_off(self):
         s, song, tracks, mod = make()
         s.disconnect()
