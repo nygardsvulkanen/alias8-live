@@ -17,7 +17,7 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 
 ## Phases
 1. ✅ (2026-11-24, mock-tested) **Skeleton + bank 1:** `_Framework` ControlSurface with SessionComponent (red box, 8 tracks), MixerComponent (volume, sends, master), track colours → nearest Alias colour, select / mute with tap.
-2. ✅ (2026-11-24, mock-tested) **Banks 2–3:** pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
+2. ✅ (2026-11-24, confirmed on hardware) **Banks 2–3:** pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
 3. **Zero config + lights:** connect-time sysex, bank detection (Alias bank sysex / MIDI channel), encoder press → scroll mode, LED polish (blink, dim).
 4. **Docs + release:** README with a labelled picture of the Alias 8, short `settings.py` (~10 options), MIT, CHANGES, a zip on GitHub Releases.
 5. **Hardware test with Daniel → v1.0.** Until then only tested with a mock Live.

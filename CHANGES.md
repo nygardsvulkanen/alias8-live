@@ -5,3 +5,4 @@
 - 2026-11-24: The encoder scrolls Live's coloured box (press it on the Alias 8 for CC mode, then turn; CC 42 relative, `SCROLL_STEP`). The box now follows only a newly selected track, so scrolling isn't undone. 22 tests.
 - 2026-11-24: Encoder scrolling confirmed on Daniel's Alias 8 in Live 12.4.
 - 2026-11-24: Phase 2: bank 2 = pan / Send C (`BANK2_SEND`), bank 3 = macros 1-16 of the selected track's first rack with pickup (`MACRO_PICKUP`), unmapped and locked macros skipped, status bar shows the macro and its value. 30 tests. Not yet tried on hardware.
+- 2026-11-24: Banks 2 and 3 confirmed on Daniel's Alias 8 in Live 12.4.
