@@ -7,6 +7,8 @@ import contextlib
 import sys
 import types
 
+LOG = []          # everything sent to the controller, in order: ("midi", bytes) or ("led", element args, value)
+
 
 class Track(object):
     def __init__(self, name, color=0xFF0000, can_be_armed=True, devices=()):
@@ -91,6 +93,7 @@ class Element(object):
 
     def send_value(self, value, force=False):
         self.sent.append(value)
+        LOG.append(("led", self.args, value))
 
 
 class ChannelStrip(object):
@@ -168,6 +171,7 @@ class ControlSurface(object):
 
     def _send_midi(self, data):
         self.midi_out.append(tuple(data))
+        LOG.append(("midi", tuple(data)))
 
     def set_highlighting_session_component(self, s):
         self.highlight = s
@@ -183,6 +187,7 @@ class ControlSurface(object):
 
 
 def install(song):
+    del LOG[:]
     ControlSurface._song = song
     mods = {
         "Live": types.ModuleType("Live"),

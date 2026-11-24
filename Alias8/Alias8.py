@@ -67,6 +67,7 @@ class Alias8(ControlSurface):
         self._enc_cc = ENCODER_CC    # the CC the encoder sends in CC mode (read from the Alias 8)
         self._enc_relative = False   # ... relative steps (True) or absolute 0-127 (False, factory)
         self._enc_last = None        # absolute mode: the last value, to see which way it turned
+        self._ready = False          # no button lights until the colour map is sent (else wrong colours at start)
         with self.component_guard():
             self._create_controls()
             self._session = SessionComponent(NUM_TRACKS, 1)
@@ -82,6 +83,10 @@ class Alias8(ControlSurface):
         for cmd in controller.ASK:                     # ask for the colour map and the encoder settings
             self._awaiting[cmd] = SETUP_TIMEOUT_TICKS
             self._send_midi(controller.request(cmd))
+        # Our colour map right away, before any light: the answer to the request above (sent first) still
+        # tells us the controller's own map, which we send back on disconnect.
+        self._send_midi(controller.message(controller.COLOR_MAP, controller.SCRIPT_COLOR_MAP))
+        self._ready = True
         self._refresh_leds(force=True)
 
     # ------------------------------------------------------------------ controller setup (temporary)
@@ -96,21 +101,16 @@ class Alias8(ControlSurface):
             self._enc_relative = controller.encoder_relative(current)
             self._enc_last = None
             return
-        if cmd not in controller.CHANGED:
-            return
-        want = controller.wanted(cmd, current)
-        if tuple(want) == tuple(current):
-            return
-        self._original.setdefault(cmd, tuple(current))
-        self._send_midi(controller.message(cmd, want))
-        if cmd == controller.COLOR_MAP:
-            self._refresh_leds(force=True)             # the same velocities now mean the right colours
+        if cmd == controller.COLOR_MAP and tuple(current) != tuple(controller.SCRIPT_COLOR_MAP):
+            self._original.setdefault(cmd, tuple(current))   # ours is already sent (in _start): remember theirs
 
     def _check_setup(self):
         for cmd in list(self._awaiting):
             self._awaiting[cmd] -= 1
-            if self._awaiting[cmd] <= 0:               # no answer: assume factory settings
-                self._got_setting(cmd, controller.FACTORY[cmd])
+            if self._awaiting[cmd] <= 0:               # no answer: assume factory encoder settings
+                self._awaiting.pop(cmd)
+                if cmd != controller.COLOR_MAP:            # (the colour map: ours is sent; theirs unknown, not restored)
+                    self._got_setting(cmd, controller.FACTORY[cmd])
 
     # ------------------------------------------------------------------ controls
     def _create_controls(self):
@@ -349,6 +349,8 @@ class Alias8(ControlSurface):
 
     # ------------------------------------------------------------------ lights
     def _refresh_leds(self, force=False):
+        if not self._ready:
+            return
         blink_on = (self._tick // BLINK_TICKS) % 2 == 0
         try:
             selected = self.song().view.selected_track

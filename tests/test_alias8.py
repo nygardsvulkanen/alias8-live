@@ -311,15 +311,36 @@ class TestAlias8(unittest.TestCase):
 
     def test_factory_controller_gets_the_colour_map_only(self):
         s, song, tracks, mod = make()
+        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)   # sent at start
         s.midi_out = []
         s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # factory answers
         s.handle_sysex(ABSOLUTE)
         s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 42, 1, 43, 1, 44, 1, 247))
-        self.assertEqual(s.midi_out, [(240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247)])   # encoder untouched
-        s.midi_out = []
+        self.assertEqual(s.midi_out, [])                                       # encoder untouched
         s.disconnect()                                                         # put the colours back
         self.assertEqual([m for m in s.midi_out if m[:5] == (240, 0, 1, 97, 11)],
                          [(240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247)])
+
+    def test_colour_map_is_sent_before_any_light(self):
+        s, song, tracks, mod = make()
+        for _ in range(3):
+            s.update_display()
+        kinds = [e[0] for e in mock_live.LOG]
+        first_led = kinds.index("led")
+        sent_map = mock_live.LOG.index(("midi", (240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247)))
+        asked = mock_live.LOG.index(("midi", (240, 0, 1, 97, 11, 7, 34, 247)))
+        self.assertLess(asked, sent_map)          # ask first, so the answer is still the controller's own map
+        self.assertLess(sent_map, first_led)
+
+    def test_no_lights_before_start(self):
+        tracks = [mock_live.Track("T1")]
+        mock_live.install(mock_live.Song(tracks))
+        for m in [m for m in sys.modules if m.startswith("Alias8")]:
+            del sys.modules[m]
+        from Alias8 import create_instance
+        s = create_instance(None)
+        s.update_display()                        # Live may refresh before the scheduled start
+        self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])
 
     def test_already_set_up_controller_is_left_alone(self):
         s, song, tracks, mod = make()
@@ -360,12 +381,14 @@ class TestAlias8(unittest.TestCase):
 
     def test_no_answer_assumes_factory(self):
         s, song, tracks, mod = make(n_tracks=20)
-        s.midi_out = []
+        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
         for _ in range(25):
             s.update_display()
-        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
         self.assertFalse(s._enc_relative)                     # factory: absolute, CC 42
         self.assertEqual(s._enc_cc, 42)
+        s.midi_out = []
+        s.disconnect()                                        # their map is unknown: nothing to put back
+        self.assertFalse([m for m in s.midi_out if m[:6] == (240, 0, 1, 97, 11, 34)])
 
     def test_later_settings_messages_are_ignored(self):
         s, song, tracks, mod = make()
