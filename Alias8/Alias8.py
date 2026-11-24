@@ -5,7 +5,8 @@
 #   bottom buttons  tap = mute, hold = solo
 #   faders          track volume; master fader = master volume
 #   bank 1 knobs    Send A (top row) / Send B (bottom row)      (BANK1_SENDS in settings.py)
-#   bank 2, 3       not yet (phase 2: pan / Send C, the selected track's rack macros)
+#   bank 2 knobs    pan / Send C                                (BANK2_SEND)
+#   bank 3 knobs    macros 1-8 / 9-16 of the selected track's first rack, with pickup (MACRO_PICKUP)
 # The 8 columns are the tracks in Live's coloured box (session highlight). Press the encoder (CC mode) and turn it
 # to scroll the box; the box also follows a newly selected track outside it (BOX_FOLLOWS_SELECTION).
 #
@@ -24,11 +25,13 @@ from _Framework.SessionComponent import SessionComponent
 from _Framework.MixerComponent import MixerComponent
 
 from .colors import OFF, nearest_color, top_led, bottom_led
-from .settings import (HOLD_SECONDS, BANK1_SENDS, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, SCROLL_STEP, NUM_TRACKS,
+from .macros import first_rack, macro_param, Pickup
+from .settings import (HOLD_SECONDS, BANK1_SENDS, BANK2_SEND, MACRO_PICKUP, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, SCROLL_STEP, NUM_TRACKS,
                        BANK_CHANNELS, KNOB_TOP_CC, KNOB_BOTTOM_CC, FADER_CC, MASTER_CC, BUTTON_TOP_NOTE,
                        BUTTON_BOTTOM_NOTE, ENCODER_CC)
 
 NUM_BANKS = len(BANK_CHANNELS)
+MACRO_BANK = 2                                 # bank 3 (0-based): the rack macros
 BANK_SYSEX = (240, 0, 1, 97, 11, 113)          # the Alias 8 reports a bank change: + <bank> 247
 SET_BANK_SYSEX = (240, 0, 1, 97, 11, 26)       # tell the Alias 8 which bank to show: + <bank> 247
 BLINK_TICKS = 4                                # update_display runs about every 100 ms: blink at ~1.25 Hz
@@ -55,6 +58,7 @@ class Alias8(ControlSurface):
         self._leds = {}            # (bank, row, column) -> last value sent
         self._tick = 0
         self._last_selected = None   # the selected track last time we looked (the box follows changes only)
+        self._pickups = {}           # macro knob (row, column) -> (parameter, Pickup)
         with self.component_guard():
             self._create_controls()
             self._session = SessionComponent(NUM_TRACKS, 1)
@@ -81,8 +85,9 @@ class Alias8(ControlSurface):
             self._btn_top.append([ButtonElement(True, MIDI_NOTE_TYPE, ch, BUTTON_TOP_NOTE + i) for i in range(NUM_TRACKS)])
             self._btn_bottom.append([ButtonElement(True, MIDI_NOTE_TYPE, ch, BUTTON_BOTTOM_NOTE + i) for i in range(NUM_TRACKS)])
             for i in range(NUM_TRACKS):
-                for el in (self._knobs_top[bank][i], self._knobs_bottom[bank][i], self._faders[bank][i]):
-                    el.add_value_listener(self._make_bank_cb(bank))
+                self._knobs_top[bank][i].add_value_listener(self._make_knob_cb(bank, 0, i))
+                self._knobs_bottom[bank][i].add_value_listener(self._make_knob_cb(bank, 1, i))
+                self._faders[bank][i].add_value_listener(self._make_bank_cb(bank))
                 self._btn_top[bank][i].add_value_listener(self._make_button_cb(bank, 0, i))
                 self._btn_bottom[bank][i].add_value_listener(self._make_button_cb(bank, 1, i))
             self._masters[bank].add_value_listener(self._make_bank_cb(bank))
@@ -101,6 +106,14 @@ class Alias8(ControlSurface):
             # Live only sends the script values of controls it hasn't mapped: a control from another bank
             if bank != self._bank:
                 self._set_bank(bank)
+        return cb
+
+    def _make_knob_cb(self, bank, row, i):
+        def cb(value):
+            if bank != self._bank:
+                self._set_bank(bank)
+            if bank == MACRO_BANK:
+                self._macro_knob(row * NUM_TRACKS + i + 1, value)
         return cb
 
     def _make_button_cb(self, bank, row, i):
@@ -124,6 +137,7 @@ class Alias8(ControlSurface):
         if bank == self._bank:
             return
         self._bank = bank
+        self._pickups.clear()                          # macro knobs pick up again on every visit
         with self.component_guard():
             self._assign_bank(bank)
         self._refresh_leds(force=True)
@@ -138,12 +152,55 @@ class Alias8(ControlSurface):
         for i in range(NUM_TRACKS):
             strip = self._mixer.channel_strip(i)
             strip.set_volume_control(self._faders[used][i] if used is not None else None)
-            sends = [None] * max(BANK1_SENDS)
+            sends = None
             if used == 0:
+                sends = [None] * max(BANK1_SENDS)
                 sends[BANK1_SENDS[0] - 1] = self._knobs_top[0][i]
                 sends[BANK1_SENDS[1] - 1] = self._knobs_bottom[0][i]
-            strip.set_send_controls(tuple(sends) if used == 0 else None)
+            elif used == 1:
+                sends = [None] * BANK2_SEND
+                sends[BANK2_SEND - 1] = self._knobs_bottom[1][i]
+            strip.set_send_controls(tuple(sends) if sends else None)
+            strip.set_pan_control(self._knobs_top[1][i] if used == 1 else None)
+            # bank 3's knobs stay unmapped: the script moves the macros itself (_macro_knob)
         self._mixer.master_strip().set_volume_control(self._masters[used] if used is not None else None)
+
+    # ------------------------------------------------------------------ bank 3: rack macros
+    def _macro_knob(self, n, value):
+        """Knob for macro n (1-16) of the selected track's first rack."""
+        try:
+            track = self.song().view.selected_track
+            rack = first_rack(track.devices)
+        except Exception:
+            return
+        if rack is None:
+            self.show_message("Alias8: %s has no rack" % track.name)
+            return
+        param = macro_param(rack, n)
+        if param is None or not getattr(param, "is_enabled", True):
+            return                                     # nothing mapped to it, or another macro controls it
+        key = n
+        entry = self._pickups.get(key)
+        if entry is None or entry[0] != param:         # another track or rack: start over (== : Live hands out new wrappers)
+            entry = (param, Pickup())
+            self._pickups[key] = entry
+        lo, hi = param.min, param.max
+        if MACRO_PICKUP:
+            new = entry[1].feed(param.value, lo, hi, value)
+        else:
+            new = lo + (hi - lo) * value / 127.0
+        if new is None:
+            self.show_message("Alias8: %s - %s %s (turn to pick up)" % (track.name, param.name, self._value_text(param)))
+            return
+        param.value = max(lo, min(hi, new))
+        self.show_message("Alias8: %s - %s %s" % (track.name, param.name, self._value_text(param)))
+
+    @staticmethod
+    def _value_text(param):
+        try:
+            return param.str_for_value(param.value)
+        except Exception:
+            return str(int(round(param.value)))
 
     # ------------------------------------------------------------------ tracks
     def _track(self, i):

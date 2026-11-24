@@ -17,7 +17,7 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 
 ## Phases
 1. ✅ (2026-11-24, mock-tested) **Skeleton + bank 1:** `_Framework` ControlSurface with SessionComponent (red box, 8 tracks), MixerComponent (volume, sends, master), track colours → nearest Alias colour, select / mute with tap.
-2. **Banks 2–3:** pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
+2. ✅ (2026-11-24, mock-tested) **Banks 2–3:** pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
 3. **Zero config + lights:** connect-time sysex, bank detection (Alias bank sysex / MIDI channel), encoder press → scroll mode, LED polish (blink, dim).
 4. **Docs + release:** README with a labelled picture of the Alias 8, short `settings.py` (~10 options), MIT, CHANGES, a zip on GitHub Releases.
 5. **Hardware test with Daniel → v1.0.** Until then only tested with a mock Live.
@@ -35,6 +35,7 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 - The coloured box follows the selected track (BOX_FOLLOWS_SELECTION) – needed until the encoder can scroll it.
 - Encoder scrolling (CC 42 relative, any channel) was moved up from phase 3 on 2026-11-24, when Daniel tried it on hardware. Daniel's Alias 8 (set up with the editor wizard) reports encoder slots (126 bank, 42, 43, 44) all relative. The factory CC-mode number is still unknown: zero config (phase 3) must set it.
 - The box follows only a *new* selection, so scrolling away from the selected track isn't undone.
+- Phase 2: bank 2 = pan (top) / `BANK2_SEND` (bottom) via MixerComponent. Bank 3 knobs stay unmapped; the script sets the macros itself with pickup (`macros.py`), the selected track's first non-MIDI rack, skipping unmapped (`macros_mapped`) and locked (`is_enabled` False) macros. Pickup restarts when the bank, track or rack changes.
 - Banks 4–15: nothing is mapped and the status bar says so. Phase 3: maybe send the controller back to bank 3.
 - Hold actions were done in phase 1 already (they belong with the buttons).
 

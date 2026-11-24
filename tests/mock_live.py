@@ -9,9 +9,28 @@ import types
 
 
 class Track(object):
-    def __init__(self, name, color=0xFF0000, can_be_armed=True):
+    def __init__(self, name, color=0xFF0000, can_be_armed=True, devices=()):
         self.name, self.color, self.can_be_armed = name, color, can_be_armed
         self.mute = self.solo = self.arm = False
+        self.devices = list(devices)
+
+
+class Param(object):
+    def __init__(self, name, value=0.0, lo=0.0, hi=127.0, enabled=True):
+        self.name, self.value, self.min, self.max, self.is_enabled = name, value, lo, hi, enabled
+
+    def str_for_value(self, v):
+        return "%d" % round(v)
+
+
+class Device(object):
+    """A plain device (can_have_chains False) or a rack with 16 macros."""
+    def __init__(self, name, rack=False, type=1, macros_mapped=None, values=None):
+        self.name, self.can_have_chains, self.type = name, rack, type
+        values = values or [0.0] * 16
+        self.parameters = [Param("Device On", 1, 0, 1)] + [Param("Macro %d" % (n + 1), values[n]) for n in range(16)]
+        if macros_mapped is not None:
+            self.macros_mapped = macros_mapped
 
 
 class Song(object):

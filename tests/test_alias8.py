@@ -123,7 +123,7 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(s._bank, 1)
         strip = s._mixer.channel_strip(0)
         self.assertIs(strip.volume, s._faders[1][0])            # faders keep doing volume
-        self.assertIsNone(strip.sends)                           # bank 2 knobs: not yet
+        self.assertEqual(strip.sends, (None, None, s._knobs_bottom[1][0]))   # bank 2: Send C
         self.assertIs(s._mixer.master_strip().volume, s._masters[1])
 
     def test_bank_change_from_a_control_on_another_channel(self):
@@ -194,6 +194,91 @@ class TestAlias8(unittest.TestCase):
     def test_decode_relative(self):
         from Alias8.Alias8 import decode_relative
         self.assertEqual([decode_relative(v) for v in (0, 1, 3, 127, 125, 64, 65, 63, 30)], [0, 1, 3, -1, -3, 0, 1, -1, 0])
+
+    # ---------------------------------------------------------------- bank 2
+    def test_bank2_pan_and_send_c(self):
+        s, song, tracks, mod = make()
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 1, 247))
+        strip = s._mixer.channel_strip(3)
+        self.assertIs(strip.pan, s._knobs_top[1][3])
+        self.assertEqual(strip.sends, (None, None, s._knobs_bottom[1][3]))
+        self.assertIs(strip.volume, s._faders[1][3])
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 0, 247))     # back to bank 1: pan released
+        self.assertIsNone(strip.pan)
+
+    # ---------------------------------------------------------------- bank 3
+    def _bank3(self, devices, mapped=None):
+        s, song, tracks, mod = make()
+        tracks[0].devices = devices
+        song.view.selected_track = tracks[0]
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 2, 247))
+        strip = s._mixer.channel_strip(0)
+        self.assertIsNone(strip.sends)                       # knobs aren't mapped by Live on bank 3
+        self.assertIsNone(strip.pan)
+        return s, song, tracks
+
+    def test_bank3_macro_with_pickup(self):
+        rack = mock_live.Device("Rack", rack=True, values=[64.0] * 16)
+        s, song, tracks = self._bank3([mock_live.Device("EQ"), rack])
+        knob = s._knobs_top[2][0]                            # macro 1
+        knob.receive(10)
+        self.assertEqual(rack.parameters[1].value, 64.0)     # far from 64: not picked up yet
+        self.assertIn("turn to pick up", s.messages[-1])
+        knob.receive(50)
+        knob.receive(70)                                     # passed 64: caught
+        self.assertAlmostEqual(rack.parameters[1].value, 70.0)
+        knob.receive(90)
+        self.assertAlmostEqual(rack.parameters[1].value, 90.0)
+        self.assertIn("T1 - Macro 1 90", s.messages[-1])
+
+    def test_bank3_bottom_row_is_macros_9_to_16(self):
+        rack = mock_live.Device("Rack", rack=True)
+        s, song, tracks = self._bank3([rack])
+        s._knobs_bottom[2][7].receive(0)                     # macro 16 is at 0: caught at once
+        s._knobs_bottom[2][7].receive(5)
+        self.assertAlmostEqual(rack.parameters[16].value, 5.0)
+
+    def test_bank3_follows_the_selected_track(self):
+        r1 = mock_live.Device("R1", rack=True)
+        r2 = mock_live.Device("R2", rack=True, values=[100.0] * 16)
+        s, song, tracks = self._bank3([r1])
+        tracks[1].devices = [r2]
+        s._knobs_top[2][1].receive(0)
+        s._knobs_top[2][1].receive(3)
+        self.assertAlmostEqual(r1.parameters[2].value, 3.0)
+        song.view.selected_track = tracks[1]
+        s._knobs_top[2][1].receive(4)
+        self.assertEqual(r2.parameters[2].value, 100.0)      # new track: picks up again
+        self.assertEqual(r1.parameters[2].value, 3.0)
+
+    def test_bank3_skips_unmapped_and_locked_macros(self):
+        rack = mock_live.Device("Rack", rack=True, macros_mapped=[False] + [True] * 15)
+        rack.parameters[2].is_enabled = False
+        s, song, tracks = self._bank3([rack])
+        s._knobs_top[2][0].receive(0); s._knobs_top[2][0].receive(9)
+        s._knobs_top[2][1].receive(0); s._knobs_top[2][1].receive(9)
+        self.assertEqual(rack.parameters[1].value, 0.0)
+        self.assertEqual(rack.parameters[2].value, 0.0)
+
+    def test_bank3_prefers_a_rack_over_a_midi_rack(self):
+        midi = mock_live.Device("Arp Rack", rack=True, type=4)
+        inst = mock_live.Device("Synth Rack", rack=True)
+        s, song, tracks = self._bank3([midi, inst])
+        s._knobs_top[2][0].receive(0); s._knobs_top[2][0].receive(8)
+        self.assertAlmostEqual(inst.parameters[1].value, 8.0)
+        self.assertEqual(midi.parameters[1].value, 0.0)
+
+    def test_bank3_track_without_rack(self):
+        s, song, tracks = self._bank3([mock_live.Device("EQ")])
+        s._knobs_top[2][0].receive(20)
+        self.assertIn("has no rack", s.messages[-1])
+
+    def test_pickup_lets_go_when_changed_elsewhere(self):
+        from Alias8.macros import Pickup
+        p = Pickup()
+        self.assertEqual(p.feed(0.0, 0, 127, 0), 0.0)
+        self.assertEqual(p.feed(0.0, 0, 127, 10), 10.0)
+        self.assertIsNone(p.feed(100.0, 0, 127, 11))       # someone moved it to 100: wait for the knob
 
     def test_disconnect_turns_lights_off(self):
         s, song, tracks, mod = make()

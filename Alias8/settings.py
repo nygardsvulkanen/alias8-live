@@ -13,6 +13,13 @@ HOLD_SECONDS = 0.4
 # Bank 1: which sends the two knob rows control (1 = Send A, 2 = Send B ...).
 BANK1_SENDS = (1, 2)
 
+# Bank 2: the top knobs are pan; the bottom knobs control this send (3 = Send C).
+BANK2_SEND = 3
+
+# Bank 3: the 16 knobs are the macros of the selected track's first rack. Pickup: a macro only moves once
+# the knob reaches its current value, so nothing jumps (False = the macro jumps to the knob at once).
+MACRO_PICKUP = True
+
 # Live's coloured box (the 8 tracks the Alias 8 controls) moves along when you select a track outside it.
 BOX_FOLLOWS_SELECTION = True
 
