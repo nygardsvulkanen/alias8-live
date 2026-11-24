@@ -8,7 +8,7 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 ## Decisions
 - **Name in Live / folder:** `Alias8`.
 - **Buttons and faders never change with the bank** (muscle memory):
-  - top buttons: tap = select track (track colour, brighter when selected), hold = arm (blink red)
+  - top buttons: tap = select track (track colour, the selected track blinks), hold = arm (alternates with red)
   - bottom buttons: tap = mute (dark when muted), hold = solo (blue)
   - faders = track volume, master fader = master volume
 - **Knobs per bank:** bank 1 sends A/B · bank 2 pan / send C · bank 3 selected track's rack macros 1–8 / 9–16 (pickup).
