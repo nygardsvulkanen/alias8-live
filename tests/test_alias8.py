@@ -14,14 +14,16 @@ import mock_live  # noqa: E402
 RED_TRACK, GREEN_TRACK, GREY_TRACK = 0xE0201B, 0x3DC300, 0x888888
 
 
-def make(n_tracks=10):
+def make(n_tracks=10, page_order=None):
     tracks = [mock_live.Track("T%d" % (i + 1), (RED_TRACK, GREEN_TRACK, GREY_TRACK)[i % 3]) for i in range(n_tracks)]
     song = mock_live.Song(tracks)
     mock_live.install(song)
     for m in [m for m in sys.modules if m.startswith("Alias8")]:
         del sys.modules[m]
-    from Alias8 import create_instance
+    from Alias8 import create_instance, settings
     from Alias8 import Alias8 as mod
+    if page_order is not None:
+        settings.PAGE_ORDER = page_order
     s = create_instance(None)
     s.run_scheduled()
     return s, song, tracks, sys.modules["Alias8.Alias8"]
@@ -410,6 +412,50 @@ class TestAlias8(unittest.TestCase):
     def test_debug_is_off_by_default(self):
         from Alias8 import settings
         self.assertFalse(settings.DEBUG)
+
+    # ---------------------------------------------------------------- PAGE_ORDER
+    def test_page_order_macros_first(self):
+        s, song, tracks, mod = make(page_order=("macros", "sends", "pan"))
+        rack = mock_live.Device("Rack", rack=True)
+        tracks[0].devices = [rack]
+        song.view.selected_track = tracks[0]
+        self.assertIsNone(s._mixer.channel_strip(0).sends)         # bank 1 = macros: knobs not mapped by Live
+        s._knobs_top[0][0].receive(0); s._knobs_top[0][0].receive(6)
+        self.assertAlmostEqual(rack.parameters[1].value, 6.0)
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 1, 247))           # bank 2 = sends
+        self.assertEqual(s._mixer.channel_strip(0).sends, (s._knobs_top[1][0], s._knobs_bottom[1][0]))
+        self.assertIn("bank 2 - sends", s.messages[-1])
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 2, 247))           # bank 3 = pan
+        self.assertIs(s._mixer.channel_strip(0).pan, s._knobs_top[2][0])
+
+    def test_page_order_two_banks(self):
+        s, song, tracks, mod = make(page_order=("sends", "macros"))
+        self.assertEqual(len(s._faders), 2)
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 2, 247))
+        self.assertIn("isn't used (banks 1-2)", s.messages[-1])
+        self.assertIsNone(s._mixer.channel_strip(0).volume)
+
+    def test_page_order_repeats_and_any_case(self):
+        s, song, tracks, mod = make(page_order=("Sends", "pan", "SENDS", "macros"))
+        self.assertEqual(s._pages, ("sends", "pan", "sends", "macros"))
+        s.handle_sysex((240, 0, 1, 97, 11, 113, 2, 247))
+        self.assertEqual(s._mixer.channel_strip(5).sends, (s._knobs_top[2][5], s._knobs_bottom[2][5]))
+        self.assertIs(s._mixer.channel_strip(5).volume, s._faders[2][5])   # faders on every bank
+
+    def test_page_order_typo_is_reported(self):
+        s, song, tracks, mod = make(page_order=("sends", "makros"))
+        self.assertEqual(s._pages, ("sends",))
+        self.assertTrue(any("left out 'makros'" in m for m in s.messages))
+
+    def test_page_order_empty_falls_back(self):
+        s, song, tracks, mod = make(page_order=())
+        self.assertEqual(s._pages, ("sends", "pan", "macros"))
+
+    def test_page_order_at_most_15(self):
+        from Alias8.pages import page_order
+        pages, problems = page_order(["sends"] * 17)
+        self.assertEqual(len(pages), 15)
+        self.assertEqual(len(problems), 2)
 
     def test_disconnect_turns_lights_off(self):
         s, song, tracks, mod = make()

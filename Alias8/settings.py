@@ -6,19 +6,39 @@
 #  again under Settings > Link, Tempo & MIDI > Control Surface).
 # =====================================================================================================
 
+# -----------------------------------------------------------------------------------------------------
+# PAGES – what the knobs do on each bank. Turn the encoder to change bank.
+# The buttons and faders are the same on every bank; only the knobs change.
+#
+#   "sends"    top knobs = Send A, bottom knobs = Send B   (which sends: SENDS_PAGE below)
+#   "pan"      top knobs = pan,    bottom knobs = Send C   (which send: PAN_PAGE_SEND below)
+#   "macros"   the 16 knobs = macros 1-16 of the selected track's first rack
+#
+# Bank 1 is the first page in the list, bank 2 the second, and so on. Reorder them, leave one out, or use
+# one twice – up to 15 banks. Examples:
+#   PAGE_ORDER = ("macros", "sends", "pan")      macros on bank 1
+#   PAGE_ORDER = ("sends", "macros")             only two banks
+# -----------------------------------------------------------------------------------------------------
+PAGE_ORDER = ("sends", "pan", "macros")
+
+# "sends" page: which sends the two knob rows control (1 = Send A, 2 = Send B ...).
+SENDS_PAGE = (1, 2)
+
+# "pan" page: which send the bottom knobs control (3 = Send C).
+PAN_PAGE_SEND = 3
+
+# "macros" page: pickup – a macro only moves once the knob reaches its current value, so nothing jumps
+# (False = the macro jumps to the knob at once).
+MACRO_PICKUP = True
+
+
+# -----------------------------------------------------------------------------------------------------
+# OTHER SETTINGS
+# -----------------------------------------------------------------------------------------------------
+
 # How long a button press must be to count as a hold (seconds).
 # Top buttons: tap = select the track, hold = arm it. Bottom buttons: tap = mute, hold = solo.
 HOLD_SECONDS = 0.4
-
-# Bank 1: which sends the two knob rows control (1 = Send A, 2 = Send B ...).
-BANK1_SENDS = (1, 2)
-
-# Bank 2: the top knobs are pan; the bottom knobs control this send (3 = Send C).
-BANK2_SEND = 3
-
-# Bank 3: the 16 knobs are the macros of the selected track's first rack. Pickup: a macro only moves once
-# the knob reaches its current value, so nothing jumps (False = the macro jumps to the knob at once).
-MACRO_PICKUP = True
 
 # Live's coloured box (the 8 tracks the Alias 8 controls) moves along when you select a track outside it.
 BOX_FOLLOWS_SELECTION = True
@@ -38,7 +58,7 @@ DEBUG = False
 # Livid editor.
 # -----------------------------------------------------------------------------------------------------
 NUM_TRACKS = 8
-BANK_CHANNELS = (0, 1, 2)        # bank 1, 2, 3 send on MIDI channel 1, 2, 3 (0-based here)
+# Bank N sends on MIDI channel N (the Alias 8's factory setting); the script follows PAGE_ORDER.
 KNOB_TOP_CC = 1                  # top knob row: CC 1-8
 KNOB_BOTTOM_CC = 9               # second knob row: CC 9-16
 FADER_CC = 17                    # faders 1-8: CC 17-24
