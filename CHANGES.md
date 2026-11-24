@@ -8,3 +8,4 @@
 - 2026-11-24: Banks 2 and 3 confirmed on Daniel's Alias 8 in Live 12.4.
 - 2026-11-24: Zero configuration: at start-up the script asks the Alias 8 for its colour map (cmd 34) and encoder style (cmd 17), sends its own if they differ (factory colours were wrong; the factory encoder press only changed bank), and puts the originals back on disconnect. Nothing is saved. Settings messages no longer fill Live's log as "unknown sysex". 36 tests.
 - 2026-11-24: Fix: scrolling past the selected track made the box jump back and forth (the buttons flickered between two colour sets). The script compared the selected track with `is`, but Live hands out a new object on every read, so every tick looked like a new selection. The fake Live now does the same, and all 37 tests pass with it.
+- 2026-11-24: Zero configuration and the scroll fix confirmed on Daniel's factory-reset Alias 8 in Live 12.4.
