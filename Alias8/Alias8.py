@@ -8,7 +8,8 @@
 #   bank 2 knobs    pan / Send C                                (BANK2_SEND)
 #   bank 3 knobs    macros 1-8 / 9-16 of the selected track's first rack, with pickup (MACRO_PICKUP)
 # The 8 columns are the tracks in Live's coloured box (session highlight). Press the encoder (CC mode) and turn it
-# to scroll the box; the box also follows a newly selected track outside it (BOX_FOLLOWS_SELECTION).
+# to scroll the box; the box also follows a newly selected track outside it (BOX_FOLLOWS_SELECTION). The script
+# reads the encoder's CC and type (absolute / relative) from the Alias 8 and never changes them.
 #
 # The Alias 8 sends each bank on its own MIDI channel (bank 1 = channel 1 ...). The script moves Live's
 # mappings to the bank in use: it hears the Alias 8's bank message, and any control from another bank.
@@ -63,6 +64,9 @@ class Alias8(ControlSurface):
         self._pickups = {}           # macro knob (row, column) -> (parameter, Pickup)
         self._awaiting = {}          # Alias 8 setting -> ticks left to wait for its answer
         self._original = {}          # Alias 8 setting -> its value before we changed it (sent back on disconnect)
+        self._enc_cc = ENCODER_CC    # the CC the encoder sends in CC mode (read from the Alias 8)
+        self._enc_relative = False   # ... relative steps (True) or absolute 0-127 (False, factory)
+        self._enc_last = None        # absolute mode: the last value, to see which way it turned
         with self.component_guard():
             self._create_controls()
             self._session = SessionComponent(NUM_TRACKS, 1)
@@ -75,15 +79,25 @@ class Alias8(ControlSurface):
 
     def _start(self):
         self._send_midi(SET_BANK_SYSEX + (0, 247))     # start on bank 1
-        for cmd in controller.SETTINGS:                # ask for the colour map and the encoder style
+        for cmd in controller.ASK:                     # ask for the colour map and the encoder settings
             self._awaiting[cmd] = SETUP_TIMEOUT_TICKS
             self._send_midi(controller.request(cmd))
         self._refresh_leds(force=True)
 
     # ------------------------------------------------------------------ controller setup (temporary)
     def _got_setting(self, cmd, current):
-        """The Alias 8 told us one of its settings: remember it and send ours if it differs."""
+        """The Alias 8 told us one of its settings. The encoder's are only read; the colour map is
+        replaced (temporarily) if it differs from the script's."""
         self._awaiting.pop(cmd, None)
+        if cmd == controller.ENCODER_MAP:
+            self._set_encoder_cc(controller.encoder_cc(current, ENCODER_CC))
+            return
+        if cmd == controller.ENCODER_TYPE:
+            self._enc_relative = controller.encoder_relative(current)
+            self._enc_last = None
+            return
+        if cmd not in controller.CHANGED:
+            return
         want = controller.wanted(cmd, current)
         if tuple(want) == tuple(current):
             return
@@ -116,13 +130,34 @@ class Alias8(ControlSurface):
                 self._btn_top[bank][i].add_value_listener(self._make_button_cb(bank, 0, i))
                 self._btn_bottom[bank][i].add_value_listener(self._make_button_cb(bank, 1, i))
             self._masters[bank].add_value_listener(self._make_bank_cb(bank))
-        # the encoder in CC mode sends on whatever bank is active, so listen on all 15 channels
-        self._encoders = [SliderElement(MIDI_CC_TYPE, ch, ENCODER_CC) for ch in range(15)]
+        self._build_encoders(ENCODER_CC)
+
+    def _build_encoders(self, cc):
+        """Listen for the encoder's CC mode on this CC. It sends on whatever bank is active, so on all 15 channels."""
+        self._enc_cc = cc
+        self._encoders = [SliderElement(MIDI_CC_TYPE, ch, cc) for ch in range(15)]
         for enc in self._encoders:
-            enc.add_value_listener(self._on_encoder)
+            enc.add_value_listener(self._make_encoder_cb(cc))
+
+    def _set_encoder_cc(self, cc):
+        if cc != self._enc_cc:
+            with self.component_guard():
+                self._build_encoders(cc)
+
+    def _make_encoder_cb(self, cc):
+        def cb(value):
+            if cc == self._enc_cc:                     # (elements for an earlier CC stay quiet)
+                self._on_encoder(value)
+        return cb
 
     def _on_encoder(self, value):
-        steps = decode_relative(value)
+        if self._enc_relative:
+            steps = decode_relative(value)
+        else:                                          # absolute: the direction it moved, one track per message
+            last, self._enc_last = self._enc_last, value
+            if last is None or value == last:
+                return
+            steps = 1 if value > last else -1
         if steps:
             self._scroll(steps * SCROLL_STEP)
 

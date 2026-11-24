@@ -27,6 +27,10 @@ def make(n_tracks=10):
     return s, song, tracks, sys.modules["Alias8.Alias8"]
 
 
+RELATIVE = (240, 0, 1, 97, 11, 17, 2, 0, 247)       # the Alias 8 answers: encoder CC mode is relative
+ABSOLUTE = (240, 0, 1, 97, 11, 17, 0, 0, 247)       # ... absolute (factory)
+
+
 class Clock(object):
     def __init__(self, mod):
         self.now = 1000.0
@@ -164,6 +168,7 @@ class TestAlias8(unittest.TestCase):
 
     def test_encoder_scrolls_the_box(self):
         s, song, tracks, mod = make(n_tracks=20)
+        s.handle_sysex(RELATIVE)
         s._encoders[0].receive(1)                 # one click forward (two's complement)
         self.assertEqual(s._session.track_offset(), 1)
         s._encoders[4].receive(65)                # offset-64 format, on bank 5's channel
@@ -176,6 +181,7 @@ class TestAlias8(unittest.TestCase):
 
     def test_encoder_stops_at_the_ends(self):
         s, song, tracks, mod = make(n_tracks=10)
+        s.handle_sysex(RELATIVE)
         s._encoders[0].receive(127)
         self.assertEqual(s._session.track_offset(), 0)
         for _ in range(5):
@@ -184,6 +190,7 @@ class TestAlias8(unittest.TestCase):
 
     def test_scrolling_isnt_undone_by_the_selection(self):
         s, song, tracks, mod = make(n_tracks=20)
+        s.handle_sysex(RELATIVE)
         song.view.selected_track = tracks[0]
         s.update_display()
         for _ in range(9):
@@ -194,6 +201,7 @@ class TestAlias8(unittest.TestCase):
     def test_scrolling_past_the_selected_track_with_live_wrappers(self):
         # Live returns a new object for selected_track on every read: the box must not snap back to it
         s, song, tracks, mod = make(n_tracks=20)
+        s.handle_sysex(RELATIVE)
         song.view.wrap = True
         song.view.selected_track = tracks[0]
         s.update_display()
@@ -299,49 +307,76 @@ class TestAlias8(unittest.TestCase):
         s, song, tracks, mod = make()
         self.assertIn((240, 0, 1, 97, 11, 7, 34, 247), s.midi_out)
         self.assertIn((240, 0, 1, 97, 11, 7, 17, 247), s.midi_out)
+        self.assertIn((240, 0, 1, 97, 11, 7, 16, 247), s.midi_out)
 
-    def test_factory_controller_gets_colour_map_and_encoder_press(self):
+    def test_factory_controller_gets_the_colour_map_only(self):
         s, song, tracks, mod = make()
         s.midi_out = []
         s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # factory answers
-        s.handle_sysex((240, 0, 1, 97, 11, 17, 0, 0, 247))
-        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
-        self.assertIn((240, 0, 1, 97, 11, 17, 2, 0, 247), s.midi_out)
+        s.handle_sysex(ABSOLUTE)
+        s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 42, 1, 43, 1, 44, 1, 247))
+        self.assertEqual(s.midi_out, [(240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247)])   # encoder untouched
         s.midi_out = []
-        s.disconnect()                                                         # put them back
-        self.assertIn((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247), s.midi_out)
-        self.assertIn((240, 0, 1, 97, 11, 17, 0, 0, 247), s.midi_out)
+        s.disconnect()                                                         # put the colours back
+        self.assertEqual([m for m in s.midi_out if m[:5] == (240, 0, 1, 97, 11)],
+                         [(240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247)])
 
     def test_already_set_up_controller_is_left_alone(self):
         s, song, tracks, mod = make()
         s.midi_out = []
         s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247))   # set up by the editor wizard
-        s.handle_sysex((240, 0, 1, 97, 11, 17, 3, 0, 247))                     # other bits are kept
+        s.handle_sysex(RELATIVE)
         self.assertEqual(s.midi_out, [])
         s.disconnect()
         self.assertFalse([m for m in s.midi_out if m[:5] == (240, 0, 1, 97, 11)])
 
-    def test_keeps_other_encoder_style_bits(self):
+    def test_never_changes_the_encoder(self):
         s, song, tracks, mod = make()
-        s.midi_out = []
-        s.handle_sysex((240, 0, 1, 97, 11, 17, 1, 5, 247))
-        self.assertIn((240, 0, 1, 97, 11, 17, 3, 5, 247), s.midi_out)
+        for msg in (ABSOLUTE, RELATIVE, (240, 0, 1, 97, 11, 16, 126, 1, 50, 1, 43, 1, 44, 1, 247)):
+            s.handle_sysex(msg)
+        for _ in range(25):
+            s.update_display()
+        s.disconnect()
+        self.assertFalse([m for m in s.midi_out if m[:6] in ((240, 0, 1, 97, 11, 16), (240, 0, 1, 97, 11, 17))])
+
+    def test_absolute_encoder_scrolls_by_direction(self):
+        s, song, tracks, mod = make(n_tracks=20)
+        s.handle_sysex(ABSOLUTE)
+        for v in (64, 72, 80, 88):          # turning forward, 8 per click (factory speed)
+            s._encoders[0].receive(v)
+        self.assertEqual(s._session.track_offset(), 3)       # the first value only sets the start
+        s._encoders[0].receive(80)
+        self.assertEqual(s._session.track_offset(), 2)
+        s._encoders[0].receive(80)                            # no change: nothing
+        self.assertEqual(s._session.track_offset(), 2)
+
+    def test_encoder_cc_comes_from_the_controller(self):
+        s, song, tracks, mod = make(n_tracks=20)
+        s.handle_sysex(RELATIVE)
+        s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 50, 1, 43, 1, 44, 1, 247))   # CC mode on CC 50
+        self.assertEqual(s._encoders[0].args[2], 50)
+        s._encoders[3].receive(1)
+        self.assertEqual(s._session.track_offset(), 1)
 
     def test_no_answer_assumes_factory(self):
-        s, song, tracks, mod = make()
+        s, song, tracks, mod = make(n_tracks=20)
         s.midi_out = []
         for _ in range(25):
             s.update_display()
         self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
-        self.assertIn((240, 0, 1, 97, 11, 17, 2, 0, 247), s.midi_out)
+        self.assertFalse(s._enc_relative)                     # factory: absolute, CC 42
+        self.assertEqual(s._enc_cc, 42)
 
     def test_later_settings_messages_are_ignored(self):
         s, song, tracks, mod = make()
         s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247))
-        s.handle_sysex((240, 0, 1, 97, 11, 17, 2, 0, 247))
+        s.handle_sysex(RELATIVE)
+        s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 42, 1, 43, 1, 44, 1, 247))
         s.midi_out = []
         s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # e.g. the editor reading it later
+        s.handle_sysex(ABSOLUTE)
         self.assertEqual(s.midi_out, [])
+        self.assertTrue(s._enc_relative)
 
     def test_disconnect_turns_lights_off(self):
         s, song, tracks, mod = make()

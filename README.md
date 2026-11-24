@@ -22,7 +22,7 @@ The buttons and faders do the same thing on every bank, so they stay in muscle m
 | Top knobs | Send A | Pan | Selected track's macros 1–8 |
 | Bottom knobs | Send B | Send C | Selected track's macros 9–16 |
 
-**Encoder:** turn it to change bank (the display shows the bank). Press it to switch to scroll mode: turning then moves Live's coloured box – which 8 tracks the Alias 8 controls – one track at a time. Press again to go back to changing banks. The box also follows when you select a track outside it in Live.
+**Encoder:** turn it to change bank (the display shows the bank). Press it to switch the Alias 8 to CC mode: turning then moves Live's coloured box – which 8 tracks the Alias 8 controls – one track at a time. Press again to go back to changing banks. The script follows your Alias 8's own encoder settings and never changes them: it reads which CC the encoder sends and whether it is absolute (factory) or relative. Absolute stops scrolling when the encoder reaches its end of 0–127; set the encoder to *relative* in the Livid editor for endless scrolling. The box also follows when you select a track outside it in Live.
 
 Track colours are rounded to the nearest of the Alias 8's seven colours (red, green, yellow, blue, pink, cyan, white). Bank 3 controls the macros of the selected track's first rack (an Instrument, Drum or Audio Effect Rack; a MIDI Effect Rack only if there is no other). Macros with nothing mapped to them are skipped. Macros use pickup: a macro only moves once the knob reaches its current value, so nothing jumps – the status bar says "turn to pick up" until then.
 
@@ -31,7 +31,7 @@ Track colours are rounded to the nearest of the Alias 8's seven colours (red, gr
 1. Download the `Alias8` folder and copy it into `~/Music/Ableton/User Library/Remote Scripts/` (Windows: `Documents\Ableton\User Library\Remote Scripts\`).
 2. Restart Live, open **Settings → Link, Tempo & MIDI**, and pick **Control Surface: Alias8**, **Input: Alias 8**, **Output: Alias 8**.
 
-Works with the Alias 8's factory settings. When Live starts, the script asks the controller for two settings and changes them if needed: the colour map (so track colours come out right) and the encoder press (so it can switch to scroll mode). Nothing is saved in the controller, and the script puts the original values back when it stops, so the Alias 8 is left as it was.
+Works with the Alias 8's factory settings. When Live starts, the script reads a few of the controller's settings. The only one it changes is the colour map, so track colours come out right – nothing is saved in the controller, and the original map is put back when the script stops. The encoder settings are left exactly as you set them.
 
 ## License
 
