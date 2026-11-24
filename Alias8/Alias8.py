@@ -6,8 +6,8 @@
 #   faders          track volume; master fader = master volume
 #   bank 1 knobs    Send A (top row) / Send B (bottom row)      (BANK1_SENDS in settings.py)
 #   bank 2, 3       not yet (phase 2: pan / Send C, the selected track's rack macros)
-# The 8 columns are the tracks in Live's coloured box (session highlight); it follows the selected track
-# (BOX_FOLLOWS_SELECTION) until the encoder can scroll it (phase 3).
+# The 8 columns are the tracks in Live's coloured box (session highlight). Press the encoder (CC mode) and turn it
+# to scroll the box; the box also follows a newly selected track outside it (BOX_FOLLOWS_SELECTION).
 #
 # The Alias 8 sends each bank on its own MIDI channel (bank 1 = channel 1 ...). The script moves Live's
 # mappings to the bank in use: it hears the Alias 8's bank message, and any control from another bank.
@@ -24,13 +24,26 @@ from _Framework.SessionComponent import SessionComponent
 from _Framework.MixerComponent import MixerComponent
 
 from .colors import OFF, nearest_color, top_led, bottom_led
-from .settings import (HOLD_SECONDS, BANK1_SENDS, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, NUM_TRACKS, BANK_CHANNELS,
-                       KNOB_TOP_CC, KNOB_BOTTOM_CC, FADER_CC, MASTER_CC, BUTTON_TOP_NOTE, BUTTON_BOTTOM_NOTE)
+from .settings import (HOLD_SECONDS, BANK1_SENDS, SELECTED_BLINKS, BOX_FOLLOWS_SELECTION, SCROLL_STEP, NUM_TRACKS,
+                       BANK_CHANNELS, KNOB_TOP_CC, KNOB_BOTTOM_CC, FADER_CC, MASTER_CC, BUTTON_TOP_NOTE,
+                       BUTTON_BOTTOM_NOTE, ENCODER_CC)
 
 NUM_BANKS = len(BANK_CHANNELS)
 BANK_SYSEX = (240, 0, 1, 97, 11, 113)          # the Alias 8 reports a bank change: + <bank> 247
 SET_BANK_SYSEX = (240, 0, 1, 97, 11, 26)       # tell the Alias 8 which bank to show: + <bank> 247
 BLINK_TICKS = 4                                # update_display runs about every 100 ms: blink at ~1.25 Hz
+
+
+def decode_relative(value):
+    """Steps from one relative encoder message. Accepts both common formats: two's complement
+    (1-15 forward, 113-127 back) and offset 64 (65-79 forward, 49-63 back). Anything else is ignored."""
+    if 1 <= value <= 15:
+        return value
+    if 113 <= value <= 127:
+        return value - 128
+    if 49 <= value <= 79:
+        return value - 64
+    return 0
 
 
 class Alias8(ControlSurface):
@@ -41,6 +54,7 @@ class Alias8(ControlSurface):
         self._held = {}            # (row, column) -> [time pressed, hold action done]
         self._leds = {}            # (bank, row, column) -> last value sent
         self._tick = 0
+        self._last_selected = None   # the selected track last time we looked (the box follows changes only)
         with self.component_guard():
             self._create_controls()
             self._session = SessionComponent(NUM_TRACKS, 1)
@@ -72,6 +86,15 @@ class Alias8(ControlSurface):
                 self._btn_top[bank][i].add_value_listener(self._make_button_cb(bank, 0, i))
                 self._btn_bottom[bank][i].add_value_listener(self._make_button_cb(bank, 1, i))
             self._masters[bank].add_value_listener(self._make_bank_cb(bank))
+        # the encoder in CC mode sends on whatever bank is active, so listen on all 15 channels
+        self._encoders = [SliderElement(MIDI_CC_TYPE, ch, ENCODER_CC) for ch in range(15)]
+        for enc in self._encoders:
+            enc.add_value_listener(self._on_encoder)
+
+    def _on_encoder(self, value):
+        steps = decode_relative(value)
+        if steps:
+            self._scroll(steps * SCROLL_STEP)
 
     def _make_bank_cb(self, bank):
         def cb(value):
@@ -132,11 +155,27 @@ class Alias8(ControlSurface):
         except Exception:
             return None
 
+    def _scroll(self, steps):
+        """Move Live's coloured box by some tracks (stops at the first and last track)."""
+        try:
+            n = len(self.song().visible_tracks)
+        except Exception:
+            return
+        old = self._session.track_offset()
+        new = max(0, min(max(0, n - NUM_TRACKS), old + steps))
+        if new != old:
+            self._session.set_offsets(new, self._session.scene_offset())
+            self.show_message("Alias8: tracks %d-%d" % (new + 1, min(n, new + NUM_TRACKS)))
+            self._refresh_leds()
+
     def _follow_selection(self):
         """Move the coloured box so the selected track is inside it."""
         try:
             tracks = list(self.song().visible_tracks)
             sel = self.song().view.selected_track
+            if sel is self._last_selected:
+                return                                 # only a new selection moves the box (scrolling stays put)
+            self._last_selected = sel
             if sel not in tracks:
                 return                                 # a return, the master, or a track in a folded group
             idx, off = tracks.index(sel), self._session.track_offset()

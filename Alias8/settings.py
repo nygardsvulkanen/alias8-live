@@ -16,6 +16,9 @@ BANK1_SENDS = (1, 2)
 # Live's coloured box (the 8 tracks the Alias 8 controls) moves along when you select a track outside it.
 BOX_FOLLOWS_SELECTION = True
 
+# Encoder in scroll mode (press it on the Alias 8): how many tracks one click moves the coloured box.
+SCROLL_STEP = 1
+
 # The selected track's button blinks (True) or just stays lit in its colour (False).
 SELECTED_BLINKS = True
 
@@ -32,3 +35,4 @@ FADER_CC = 17                    # faders 1-8: CC 17-24
 MASTER_CC = 25                   # master fader
 BUTTON_TOP_NOTE = 0              # top buttons: notes 0-7
 BUTTON_BOTTOM_NOTE = 8           # bottom buttons: notes 8-15
+ENCODER_CC = 42                  # the encoder after a press (CC mode, relative); it sends on the active bank's channel

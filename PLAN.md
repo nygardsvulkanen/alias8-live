@@ -33,6 +33,8 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 - Faders/knobs use Live's own mapping (MixerComponent); the script moves the mappings to the active bank (bank sysex, or any control arriving on another bank's channel).
 - The selected track blinks (the Alias 8 has no brightness levels); armed alternates with red.
 - The coloured box follows the selected track (BOX_FOLLOWS_SELECTION) – needed until the encoder can scroll it.
+- Encoder scrolling (CC 42 relative, any channel) was moved up from phase 3 on 2026-11-24, when Daniel tried it on hardware. Daniel's Alias 8 (set up with the editor wizard) reports encoder slots (126 bank, 42, 43, 44) all relative. The factory CC-mode number is still unknown: zero config (phase 3) must set it.
+- The box follows only a *new* selection, so scrolling away from the selected track isn't undone.
 - Banks 4–15: nothing is mapped and the status bar says so. Phase 3: maybe send the controller back to bank 3.
 - Hold actions were done in phase 1 already (they belong with the buttons).
 

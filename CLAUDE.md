@@ -8,6 +8,9 @@ Owner: Daniel (writes in Swedish; answer in Swedish, keep code/comments/docs in 
 - `livid-editor` – the Livid editor; `app/js/wizard.js` has the exact sysex for controller setup.
 - `scribble-strip` – not used by this script.
 
+## Installed for Daniel
+`~/Music/Ableton/User Library/Remote Scripts/Alias8` is a symlink to `Alias8/` in this repo (his earlier copy is on the Desktop as `Alias8-copy-backup-2026-11-24`). Edits here are live after reloading the script in Live (Control Surface None → Alias8, or restart Live).
+
 ## Working rules
 - Keep it small and generic: no naming conventions, no personal settings, no UDP/viewer code.
 - Buttons and faders must do the same on every bank (muscle memory); only knobs change.

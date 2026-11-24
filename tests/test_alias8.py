@@ -162,6 +162,39 @@ class TestAlias8(unittest.TestCase):
         s.update_display()
         self.assertEqual(s._session.track_offset(), 1)      # already inside: the box stays
 
+    def test_encoder_scrolls_the_box(self):
+        s, song, tracks, mod = make(n_tracks=20)
+        s._encoders[0].receive(1)                 # one click forward (two's complement)
+        self.assertEqual(s._session.track_offset(), 1)
+        s._encoders[4].receive(65)                # offset-64 format, on bank 5's channel
+        self.assertEqual(s._session.track_offset(), 2)
+        s._encoders[0].receive(127)               # one click back
+        self.assertEqual(s._session.track_offset(), 1)
+        self.assertIn("tracks 2-9", s.messages[-1])
+        s._btn_top[0][0].receive(127)
+        self.assertIs(song.view.selected_track, tracks[1])   # the columns follow the box
+
+    def test_encoder_stops_at_the_ends(self):
+        s, song, tracks, mod = make(n_tracks=10)
+        s._encoders[0].receive(127)
+        self.assertEqual(s._session.track_offset(), 0)
+        for _ in range(5):
+            s._encoders[0].receive(1)
+        self.assertEqual(s._session.track_offset(), 2)        # 10 tracks: the last box is tracks 3-10
+
+    def test_scrolling_isnt_undone_by_the_selection(self):
+        s, song, tracks, mod = make(n_tracks=20)
+        song.view.selected_track = tracks[0]
+        s.update_display()
+        for _ in range(9):
+            s._encoders[0].receive(1)
+        s.update_display()
+        self.assertEqual(s._session.track_offset(), 9)        # the selected track 1 is outside, the box stays
+
+    def test_decode_relative(self):
+        from Alias8.Alias8 import decode_relative
+        self.assertEqual([decode_relative(v) for v in (0, 1, 3, 127, 125, 64, 65, 63, 30)], [0, 1, 3, -1, -3, 0, 1, -1, 0])
+
     def test_disconnect_turns_lights_off(self):
         s, song, tracks, mod = make()
         s.disconnect()
