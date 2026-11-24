@@ -13,4 +13,5 @@ Owner: Daniel (writes in Swedish; answer in Swedish, keep code/comments/docs in 
 - Buttons and faders must do the same on every bank (muscle memory); only knobs change.
 - Never save anything to the controller ("save to device"); connect-time sysex is temporary.
 - Every change: a line in `CHANGES.md`, commit.
-- Testing: mock-Live harness (fake `Live` / `_Framework`) until Daniel tests on hardware.
+- Testing: `python3 -m unittest discover tests` (fake Live / `_Framework` in `tests/mock_live.py`) until Daniel tests on hardware. Add a test for every behaviour.
+- Layout: `Alias8/Alias8.py` (the script), `Alias8/colors.py` (pure colour logic), `Alias8/settings.py` (user settings + factory MIDI map).

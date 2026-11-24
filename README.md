@@ -1,6 +1,6 @@
 # Alias8 – Ableton Live script for the Livid Alias 8
 
-**Work in progress – not usable yet.**
+**Work in progress.** Phase 1 is written (bank 1, buttons, lights) and tested against a simulated Live – not yet on a real Alias 8. See `PLAN.md`.
 
 A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller: track colours on the buttons, select, arm, mute, solo, volume, sends, pan and the selected track's rack macros. No editor setup needed, no naming rules for tracks or racks.
 
@@ -12,7 +12,7 @@ The buttons and faders do the same thing on every bank, so they stay in muscle m
 
 | | Every bank |
 |---|---|
-| Top buttons | **Tap = select track** (track colour, brighter when selected) · **hold = arm** (blinks red) |
+| Top buttons | **Tap = select track** (track colour; the selected track blinks) · **hold = arm** (blinks red) |
 | Bottom buttons | **Tap = mute** (dark when muted) · **hold = solo** (blue) |
 | Faders | Track volume |
 | Master fader | Master volume |
@@ -22,7 +22,7 @@ The buttons and faders do the same thing on every bank, so they stay in muscle m
 | Top knobs | Send A | Pan | Selected track's macros 1–8 |
 | Bottom knobs | Send B | Send C | Selected track's macros 9–16 |
 
-**Encoder:** turn it to change bank (the display shows the bank). Press it to switch to scroll mode: turning then moves Live's coloured box – which 8 tracks the Alias 8 controls – one track at a time. Press again to go back to changing banks.
+**Encoder:** turn it to change bank (the display shows the bank). Press it to switch to scroll mode: turning then moves Live's coloured box – which 8 tracks the Alias 8 controls – one track at a time. Press again to go back to changing banks. The box also follows when you select a track outside it in Live.
 
 Track colours are rounded to the nearest of the Alias 8's seven colours (red, green, yellow, blue, pink, cyan, white). Macros use pickup: a macro only moves once the knob reaches its current value, so nothing jumps.
 

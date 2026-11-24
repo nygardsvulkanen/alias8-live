@@ -16,8 +16,8 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 - **Zero configuration:** works on factory settings. On connect the script sends temporary sysex (not saved): local LED control off for buttons, "any channel" off, the colour map, and the encoder's CC-mode slot (CC 42, relative). Same commands the Livid editor's wizard sends; never "save to device".
 
 ## Phases
-1. **Skeleton + bank 1:** `_Framework` ControlSurface with SessionComponent (red box, 8 tracks), MixerComponent (volume, sends, master), track colours → nearest Alias colour, select / mute with tap.
-2. **Hold actions + banks 2–3:** hold = arm / solo, pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
+1. ✅ (2026-11-24, mock-tested) **Skeleton + bank 1:** `_Framework` ControlSurface with SessionComponent (red box, 8 tracks), MixerComponent (volume, sends, master), track colours → nearest Alias colour, select / mute with tap.
+2. **Banks 2–3:** pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
 3. **Zero config + lights:** connect-time sysex, bank detection (Alias bank sysex / MIDI channel), encoder press → scroll mode, LED polish (blink, dim).
 4. **Docs + release:** README with a labelled picture of the Alias 8, short `settings.py` (~10 options), MIT, CHANGES, a zip on GitHub Releases.
 5. **Hardware test with Daniel → v1.0.** Until then only tested with a mock Live.
@@ -27,6 +27,14 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 - Bank sysex: the Alias 8 sends `F0 00 01 61 0B 71 <bank> F7` on a bank change; set bank with `F0 00 01 61 0B 1A <bank> F7`.
 - Pickup logic for macros.
 - The connect-time sysex: see the Livid editor's `app/js/wizard.js` ("ableton" template) for exact commands.
+
+## Notes from phase 1
+- Buttons are handled by the script (tap/hold), not by MixerComponent: select acts on press (a hold then also arms), mute acts on release (a hold solos instead).
+- Faders/knobs use Live's own mapping (MixerComponent); the script moves the mappings to the active bank (bank sysex, or any control arriving on another bank's channel).
+- The selected track blinks (the Alias 8 has no brightness levels); armed alternates with red.
+- The coloured box follows the selected track (BOX_FOLLOWS_SELECTION) – needed until the encoder can scroll it.
+- Banks 4–15: nothing is mapped and the status bar says so. Phase 3: maybe send the controller back to bank 3.
+- Hold actions were done in phase 1 already (they belong with the buttons).
 
 ## Open questions (find out during phase 1–3)
 - Factory MIDI map of the Alias 8 (knobs CC 1–16, faders 17–24, master 25, buttons notes 0–15 – confirm with the editor's "Sequential" template).
