@@ -77,3 +77,39 @@ def encoder_relative(encoder_type):
         return bool(int(encoder_type[0]) & 2)
     except (IndexError, TypeError, ValueError):
         return False
+
+
+# ---------------------------------------------------------------- the buttons' own LED colours
+# Cmd 4 (one bank) and cmd 37 (15 banks, 8 bytes each): 2 buttons per byte, 3 bits each (red, green, blue),
+# in note order (with the factory LED note map). Colour index = red + 2 green + 4 blue:
+# 0 off, 1 red, 2 green, 3 yellow, 4 blue, 5 pink, 6 cyan, 7 white – the same index the colour map uses.
+RANGE_START = (0, 1, 4, 8, 16, 32, 64, 127)     # the first velocity of each of the colour map's 8 ranges
+
+
+def decode_leds(data):
+    """The 16 buttons' colour indices (0-7) from 8 bytes of LED bits."""
+    colours = [0] * 16
+    for i, byte in enumerate(tuple(data)[:8]):
+        for k in range(6):
+            if byte & (1 << k):
+                colours[i * 2 + k // 3] |= 1 << (k % 3)
+    return colours
+
+
+def bank_leds(saved, bank):
+    """The saved colour indices of one bank's 16 buttons, or None if we don't know them."""
+    if LEDS_ALL in saved and len(saved[LEDS_ALL]) >= (bank + 1) * 8:
+        return decode_leds(saved[LEDS_ALL][bank * 8:(bank + 1) * 8])
+    if LEDS in saved and CURRENT_BANK in saved and tuple(saved[CURRENT_BANK])[:1] == (bank,):
+        return decode_leds(saved[LEDS])
+    return None
+
+
+def velocity_for(colour, colour_map):
+    """The note velocity that shows colour index `colour` with this colour map, or None."""
+    if not colour:
+        return 0
+    for i, c in enumerate(tuple(colour_map)[:8]):
+        if c == colour:
+            return RANGE_START[i]
+    return None

@@ -342,16 +342,33 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(dev.settings[34], self.MAP_FACTORY)
 
     def test_buttons_own_colours_are_put_back(self):
-        dev = mock_live.FakeAlias8(settings={26: (4,)})                    # it was on bank 5
+        dev = mock_live.FakeAlias8(settings={26: (4,)})                    # it was on bank 5; bank 1 button 1 red
         s, song, tracks, mod = make(device=dev)
-        dev.settings[4] = (0,) * 8                                          # Live's colours changed them
-        dev.settings[26] = (0,)
+        s.midi_out = []
         s.disconnect()
-        self.assertEqual(dev.settings[26], (4,))                            # back to bank 5 ...
-        self.assertEqual(dev.settings[4], (1, 0, 0, 0, 0, 0, 0, 0))        # ... with its saved red button
-        self.assertEqual(dev.settings[37], (1,) + (0,) * 119)
-        order = [m[5] for m in s.midi_out[-4:]]
-        self.assertEqual(order, [34, 37, 26, 4])                            # colour map, all banks, bank, its LEDs
+        from Alias8.colors import RED
+        self.assertEqual(s._btn_top[0][0].sent[-1], RED)                   # as a LED note, not sysex
+        self.assertEqual([s._btn_top[0][i].sent[-1] for i in range(1, 8)], [0] * 7)
+        self.assertEqual(s._btn_bottom[1][3].sent[-1], 0)
+        self.assertEqual(dev.settings[26], (4,))                            # back to bank 5
+        self.assertFalse([m for m in s.midi_out if m[5:6] in ((4,), (37,))])   # no LED sysex burst
+
+    def test_saved_colours_use_the_active_colour_map(self):
+        dev = mock_live.FakeAlias8(settings={4: (2 | 8, 0, 0, 0, 0, 0, 0, 0), 37: ()})  # green, red (cmd 37 empty)
+        del dev.settings[37]
+        s, song, tracks, mod = make(device=dev)
+        for _ in range(20):
+            s.update_display()
+        s.disconnect()
+        self.assertEqual(s._btn_top[0][0].sent[-1], 4)                     # green with the script's map
+        self.assertEqual(s._btn_top[0][1].sent[-1], 1)                     # red
+        self.assertEqual(dev.settings[34], (0, 7, 6, 5, 1, 4, 3, 2))       # factory map back afterwards
+
+    def test_decode_leds(self):
+        from Alias8.controller import decode_leds
+        self.assertEqual(decode_leds((1, 0, 0, 0, 0, 0, 0, 0))[:2], [1, 0])
+        self.assertEqual(decode_leds((8 | 16 | 32, 0, 0, 0, 0, 0, 0, 0))[:2], [0, 7])
+        self.assertEqual(decode_leds((0, 0, 0, 0, 0, 0, 0, 4 << 3))[15], 4)
 
     def test_leds_are_read_before_any_light(self):
         s, song, tracks, mod = make()
@@ -490,7 +507,10 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(len(problems), 2)
 
     def test_disconnect_turns_lights_off(self):
-        s, song, tracks, mod = make()
+        dev = mock_live.FakeAlias8(answers=False)                          # nothing known: dark
+        s, song, tracks, mod = make(device=dev)
+        for _ in range(400):
+            s.update_display()
         s.disconnect()
         self.assertEqual(s._btn_top[0][0].sent[-1], 0)
         self.assertEqual(s._btn_bottom[2][7].sent[-1], 0)

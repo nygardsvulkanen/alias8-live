@@ -430,20 +430,27 @@ class Alias8(ControlSurface):
         self._refresh_leds()
 
     def disconnect(self):
-        """Leave the Alias 8 as we found it: its colour map, its bank and its buttons' own LED colours."""
+        """Leave the Alias 8 as we found it: its buttons' own colours, its colour map and its bank.
+        The colours go out as ordinary LED notes (sysex sent in a burst at shutdown gets lost), computed
+        for the colour map that is active right now; the controller keeps them when the map changes back."""
         back = dict(self._original)
         back.update(self._saved)
         self._debug("disconnect: putting back %s" % (back or "nothing (unknown)"))
-        for bank in range(self._num_banks):            # Live's colours off
+        active_map = controller.SCRIPT_COLOR_MAP if self._ready else self._original.get(
+            controller.COLOR_MAP, controller.SCRIPT_COLOR_MAP)
+        for bank in range(self._num_banks):
+            colours = controller.bank_leds(self._saved, bank)
             for i in range(NUM_TRACKS):
-                self._btn_top[bank][i].send_value(OFF, True)
-                self._btn_bottom[bank][i].send_value(OFF, True)
+                for row, buttons in ((0, self._btn_top), (1, self._btn_bottom)):
+                    vel = OFF
+                    if colours is not None:
+                        vel = controller.velocity_for(colours[row * NUM_TRACKS + i], active_map)
+                        if vel is None:
+                            vel = OFF                  # that colour isn't in the map: dark
+                    buttons[bank][i].send_value(vel, True)
         for cmd, data in self._original.items():       # the colour map
             self._send_midi(controller.message(cmd, data))
-        if controller.LEDS_ALL in self._saved:         # every bank's button colours, if it told us
-            self._send_midi(controller.message(controller.LEDS_ALL, self._saved[controller.LEDS_ALL]))
-        if controller.CURRENT_BANK in self._saved:     # back to its bank ...
-            self._send_midi(controller.message(controller.CURRENT_BANK, self._saved[controller.CURRENT_BANK]))
-        if controller.LEDS in self._saved:             # ... and that bank's button colours
-            self._send_midi(controller.message(controller.LEDS, self._saved[controller.LEDS]))
+        saved_bank = self._saved.get(controller.CURRENT_BANK)
+        if saved_bank and tuple(saved_bank)[:1] != (self._bank,):
+            self._send_midi(controller.message(controller.CURRENT_BANK, saved_bank))   # back to its bank
         ControlSurface.disconnect(self)
