@@ -33,7 +33,7 @@ Track colours are rounded to the nearest of the Alias 8's seven colours (red, gr
 1. Download the `Alias8` folder and copy it into `~/Music/Ableton/User Library/Remote Scripts/` (Windows: `Documents\Ableton\User Library\Remote Scripts\`).
 2. Restart Live, open **Settings → Link, Tempo & MIDI**, and pick **Control Surface: Alias8**, **Input: Alias 8**, **Output: Alias 8**.
 
-Works with the Alias 8's factory settings. When Live starts, the script reads a few of the controller's settings. The only one it changes is the colour map, so track colours come out right – nothing is saved in the controller, and the original map is put back when the script stops. The encoder settings are left exactly as you set them.
+Works with the Alias 8's factory settings. When Live starts, the script reads a few of the controller's settings. The only one it changes is the colour map, so track colours come out right – nothing is saved in the controller. When the script stops it puts back the original colour map, the bank the Alias 8 was on and the buttons' own colours, so the controller looks as it did before Live started. The encoder settings are left exactly as you set them.
 
 ## License
 

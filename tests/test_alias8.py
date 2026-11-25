@@ -309,8 +309,11 @@ class TestAlias8(unittest.TestCase):
         dev = mock_live.FakeAlias8(delay=True)
         s, song, tracks, mod = make(device=dev)
         reqs = [m for m in s.midi_out if m[5:6] == (7,)]
-        self.assertEqual(reqs, [(240, 0, 1, 97, 11, 7, 34, 247)])         # only the first question so far
-        self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])      # no light before the colour map
+        self.assertEqual(reqs, [(240, 0, 1, 97, 11, 7, 26, 247)])         # only the first question so far
+        for cmd in (4, 37, 34):                                             # bank, LEDs, all LEDs, colour map
+            self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])  # no light before the colour map
+            dev.deliver()
+            self.assertEqual([m for m in s.midi_out if m[5:6] == (7,)][-1], (240, 0, 1, 97, 11, 7, cmd, 247))
         dev.deliver()                                                       # colour map answered
         self.assertEqual(dev.settings[34], self.MAP_SCRIPT)
         self.assertTrue([e for e in mock_live.LOG if e[0] == "led"])
@@ -337,6 +340,36 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(dev.settings[34], self.MAP_SCRIPT)
         s.disconnect()
         self.assertEqual(dev.settings[34], self.MAP_FACTORY)
+
+    def test_buttons_own_colours_are_put_back(self):
+        dev = mock_live.FakeAlias8(settings={26: (4,)})                    # it was on bank 5
+        s, song, tracks, mod = make(device=dev)
+        dev.settings[4] = (0,) * 8                                          # Live's colours changed them
+        dev.settings[26] = (0,)
+        s.disconnect()
+        self.assertEqual(dev.settings[26], (4,))                            # back to bank 5 ...
+        self.assertEqual(dev.settings[4], (1, 0, 0, 0, 0, 0, 0, 0))        # ... with its saved red button
+        self.assertEqual(dev.settings[37], (1,) + (0,) * 119)
+        order = [m[5] for m in s.midi_out[-4:]]
+        self.assertEqual(order, [34, 37, 26, 4])                            # colour map, all banks, bank, its LEDs
+
+    def test_leds_are_read_before_any_light(self):
+        s, song, tracks, mod = make()
+        first_led = [e[0] for e in mock_live.LOG].index("led")
+        asked_leds = mock_live.LOG.index(("midi", (240, 0, 1, 97, 11, 7, 4, 247)))
+        self.assertLess(asked_leds, first_led)
+
+    def test_no_answer_about_all_banks_is_fine(self):
+        dev = mock_live.FakeAlias8()
+        del dev.settings[37]                                                # the real Alias 8 may not answer it
+        s, song, tracks, mod = make(device=dev)
+        self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])
+        for _ in range(20):
+            s.update_display()                                             # asked once, then goes on
+        self.assertTrue([e for e in mock_live.LOG if e[0] == "led"])
+        self.assertEqual(len([m for m in s.midi_out if m == (240, 0, 1, 97, 11, 7, 37, 247)]), 1)
+        s.disconnect()
+        self.assertFalse([m for m in s.midi_out if m[5:6] == (37,) and len(m) > 8])
 
     def test_already_set_up_controller_is_left_alone(self):
         dev = mock_live.FakeAlias8(relative=True, settings={34: (0, 1, 2, 3, 4, 5, 6, 7)})
@@ -366,7 +399,7 @@ class TestAlias8(unittest.TestCase):
     def test_no_answer_assumes_factory(self):
         s, song, tracks, mod = make(n_tracks=20, device=mock_live.FakeAlias8(answers=False))
         self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])
-        for _ in range(200):
+        for _ in range(400):
             s.update_display()
         self.assertIn((240, 0, 1, 97, 11, 34) + self.MAP_SCRIPT + (247,), s.midi_out)   # sent anyway
         self.assertTrue([e for e in mock_live.LOG if e[0] == "led"])

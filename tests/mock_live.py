@@ -150,13 +150,18 @@ class FakeAlias8(object):
 
     def __init__(self, relative=False, answers=True, drop=None, delay=False, settings=None):
         self.settings = {34: (0, 7, 6, 5, 1, 4, 3, 2), 16: (126, 1, 42, 1, 43, 1, 44, 1),
-                         17: (2, 0) if relative else (0, 0)}
+                         17: (2, 0) if relative else (0, 0), 26: (0,),
+                         4: (1, 0, 0, 0, 0, 0, 0, 0),           # button 1 saved red, the rest off
+                         37: (1,) + (0,) * 119}                 # all banks (the real Alias 8 may not answer)
+        self.leds_from_notes = 0                                # LED messages received (notes)
         self.settings.update(settings or {})
         self.answers, self.drop, self.delay = answers, dict(drop or {}), delay
         self.pending = []
         self.surface = None
 
     def receive(self, data):
+        if data[0] & 0xF0 in (0x90, 0x80):            # (not used: the fake elements don't send MIDI)
+            return
         if data[:5] != self.HEADER or len(data) < 7:
             return
         cmd = data[5]

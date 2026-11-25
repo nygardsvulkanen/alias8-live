@@ -68,6 +68,7 @@ class Alias8(ControlSurface):
         self._awaiting = {}          # the Alias 8 setting we asked about -> ticks left to wait for its answer
         self._queue = []             # settings still to ask about, one at a time
         self._tries = {}             # setting -> how many times we asked
+        self._saved = {}             # bank and the buttons' own LED colours from start-up -> put back on disconnect
         self._original = {}          # Alias 8 setting -> its value before we changed it (sent back on disconnect)
         self._enc_cc = ENCODER_CC    # the CC the encoder sends in CC mode (read from the Alias 8)
         self._enc_relative = False   # ... relative steps (True) or absolute 0-127 (False, factory)
@@ -89,7 +90,7 @@ class Alias8(ControlSurface):
 
     def _start(self):
         # One question at a time: the Alias 8 is slow, and drops a question when more sysex follows at once.
-        # The colour map comes first, so the buttons can light up as soon as it's settled.
+        # Its bank and button colours first (before we light anything), then the colour map (then the lights).
         self._queue = list(controller.ASK)
         self._ask_next()
 
@@ -115,6 +116,9 @@ class Alias8(ControlSurface):
         elif cmd == controller.ENCODER_TYPE:
             self._enc_relative = controller.encoder_relative(current or controller.FACTORY[cmd])
             self._enc_last = None
+        elif cmd in controller.RESTORED:
+            if current is not None:
+                self._saved[cmd] = tuple(current)      # put back on disconnect
         elif cmd == controller.COLOR_MAP:
             if current is None or tuple(current) != tuple(controller.SCRIPT_COLOR_MAP):
                 if current is not None:
@@ -130,7 +134,7 @@ class Alias8(ControlSurface):
             if self._awaiting[cmd] > 0:
                 continue
             tries = self._tries.get(cmd, 1)
-            if tries < SETUP_TRIES:                    # ask once more
+            if tries < controller.TRIES.get(cmd, SETUP_TRIES):                    # ask once more
                 self._tries[cmd] = tries + 1
                 self._awaiting[cmd] = SETUP_TIMEOUT_TICKS
                 self._send_midi(controller.request(cmd))
@@ -426,11 +430,20 @@ class Alias8(ControlSurface):
         self._refresh_leds()
 
     def disconnect(self):
-        self._debug("disconnect: putting back %s" % (dict(self._original) or "nothing (unchanged or unknown)"))
-        for cmd, data in self._original.items():       # leave the Alias 8 as we found it
-            self._send_midi(controller.message(cmd, data))
-        for bank in range(self._num_banks):
+        """Leave the Alias 8 as we found it: its colour map, its bank and its buttons' own LED colours."""
+        back = dict(self._original)
+        back.update(self._saved)
+        self._debug("disconnect: putting back %s" % (back or "nothing (unknown)"))
+        for bank in range(self._num_banks):            # Live's colours off
             for i in range(NUM_TRACKS):
                 self._btn_top[bank][i].send_value(OFF, True)
                 self._btn_bottom[bank][i].send_value(OFF, True)
+        for cmd, data in self._original.items():       # the colour map
+            self._send_midi(controller.message(cmd, data))
+        if controller.LEDS_ALL in self._saved:         # every bank's button colours, if it told us
+            self._send_midi(controller.message(controller.LEDS_ALL, self._saved[controller.LEDS_ALL]))
+        if controller.CURRENT_BANK in self._saved:     # back to its bank ...
+            self._send_midi(controller.message(controller.CURRENT_BANK, self._saved[controller.CURRENT_BANK]))
+        if controller.LEDS in self._saved:             # ... and that bank's button colours
+            self._send_midi(controller.message(controller.LEDS, self._saved[controller.LEDS]))
         ControlSurface.disconnect(self)
