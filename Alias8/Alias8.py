@@ -37,7 +37,8 @@ from .settings import (DEBUG, SENDS_PAGE, PAN_PAGE_SEND, HOLD_SECONDS, MACRO_PIC
 BANK_SYSEX = (240, 0, 1, 97, 11, 113)          # the Alias 8 reports a bank change: + <bank> 247
 SET_BANK_SYSEX = (240, 0, 1, 97, 11, 26)       # tell the Alias 8 which bank to show: + <bank> 247
 BLINK_TICKS = 4                                # update_display runs about every 100 ms: blink at ~1.25 Hz
-SETUP_TIMEOUT_TICKS = 20                       # ~2 s: no answer from the Alias 8 = assume factory settings
+SETUP_TIMEOUT_TICKS = 15                       # ~1.5 s per try to answer a question about a setting
+SETUP_TRIES = 3                                # then go on without it (factory values for the encoder)
 
 
 def decode_relative(value):
@@ -64,7 +65,9 @@ class Alias8(ControlSurface):
         self._tick = 0
         self._last_selected = None   # the selected track last time we looked (the box follows changes only)
         self._pickups = {}           # macro knob (row, column) -> (parameter, Pickup)
-        self._awaiting = {}          # Alias 8 setting -> ticks left to wait for its answer
+        self._awaiting = {}          # the Alias 8 setting we asked about -> ticks left to wait for its answer
+        self._queue = []             # settings still to ask about, one at a time
+        self._tries = {}             # setting -> how many times we asked
         self._original = {}          # Alias 8 setting -> its value before we changed it (sent back on disconnect)
         self._enc_cc = ENCODER_CC    # the CC the encoder sends in CC mode (read from the Alias 8)
         self._enc_relative = False   # ... relative steps (True) or absolute 0-127 (False, factory)
@@ -85,39 +88,54 @@ class Alias8(ControlSurface):
             self.show_message("Alias8 connected")
 
     def _start(self):
-        self._send_midi(SET_BANK_SYSEX + (0, 247))     # start on bank 1
-        for cmd in controller.ASK:                     # ask for the colour map and the encoder settings
-            self._awaiting[cmd] = SETUP_TIMEOUT_TICKS
-            self._send_midi(controller.request(cmd))
-        # Our colour map right away, before any light: the answer to the request above (sent first) still
-        # tells us the controller's own map, which we send back on disconnect.
-        self._send_midi(controller.message(controller.COLOR_MAP, controller.SCRIPT_COLOR_MAP))
-        self._ready = True
-        self._refresh_leds(force=True)
+        # One question at a time: the Alias 8 is slow, and drops a question when more sysex follows at once.
+        # The colour map comes first, so the buttons can light up as soon as it's settled.
+        self._queue = list(controller.ASK)
+        self._ask_next()
 
     # ------------------------------------------------------------------ controller setup (temporary)
+    def _ask_next(self):
+        if not self._queue:
+            self._send_midi(SET_BANK_SYSEX + (0, 247))     # setup done: start on bank 1
+            return
+        cmd = self._queue[0]
+        self._awaiting = {cmd: SETUP_TIMEOUT_TICKS}
+        self._send_midi(controller.request(cmd))
+
     def _got_setting(self, cmd, current):
         """The Alias 8 told us one of its settings. The encoder's are only read; the colour map is
-        replaced (temporarily) if it differs from the script's."""
+        replaced (temporarily) if it differs from the script's, and the original is kept for disconnect."""
         self._awaiting.pop(cmd, None)
-        self._debug("Alias 8 setting %d = %s" % (cmd, tuple(current)))
+        self._tries.pop(cmd, None)
+        if self._queue and self._queue[0] == cmd:
+            self._queue.pop(0)
+        self._debug("Alias 8 setting %d = %s" % (cmd, tuple(current) if current is not None else "no answer"))
         if cmd == controller.ENCODER_MAP:
-            self._set_encoder_cc(controller.encoder_cc(current, ENCODER_CC))
-            return
-        if cmd == controller.ENCODER_TYPE:
-            self._enc_relative = controller.encoder_relative(current)
+            self._set_encoder_cc(controller.encoder_cc(current or controller.FACTORY[cmd], ENCODER_CC))
+        elif cmd == controller.ENCODER_TYPE:
+            self._enc_relative = controller.encoder_relative(current or controller.FACTORY[cmd])
             self._enc_last = None
-            return
-        if cmd == controller.COLOR_MAP and tuple(current) != tuple(controller.SCRIPT_COLOR_MAP):
-            self._original.setdefault(cmd, tuple(current))   # ours is already sent (in _start): remember theirs
+        elif cmd == controller.COLOR_MAP:
+            if current is None or tuple(current) != tuple(controller.SCRIPT_COLOR_MAP):
+                if current is not None:
+                    self._original.setdefault(cmd, tuple(current))   # sent back on disconnect
+                self._send_midi(controller.message(cmd, controller.SCRIPT_COLOR_MAP))
+            self._ready = True                         # the colours are right now: light the buttons
+            self._refresh_leds(force=True)
+        self._ask_next()
 
     def _check_setup(self):
         for cmd in list(self._awaiting):
             self._awaiting[cmd] -= 1
-            if self._awaiting[cmd] <= 0:               # no answer: assume factory encoder settings
-                self._awaiting.pop(cmd)
-                if cmd != controller.COLOR_MAP:            # (the colour map: ours is sent; theirs unknown, not restored)
-                    self._got_setting(cmd, controller.FACTORY[cmd])
+            if self._awaiting[cmd] > 0:
+                continue
+            tries = self._tries.get(cmd, 1)
+            if tries < SETUP_TRIES:                    # ask once more
+                self._tries[cmd] = tries + 1
+                self._awaiting[cmd] = SETUP_TIMEOUT_TICKS
+                self._send_midi(controller.request(cmd))
+            else:                                      # still no answer: go on without it
+                self._got_setting(cmd, None)
 
     # ------------------------------------------------------------------ controls
     def _create_controls(self):
@@ -408,6 +426,7 @@ class Alias8(ControlSurface):
         self._refresh_leds()
 
     def disconnect(self):
+        self._debug("disconnect: putting back %s" % (dict(self._original) or "nothing (unchanged or unknown)"))
         for cmd, data in self._original.items():       # leave the Alias 8 as we found it
             self._send_midi(controller.message(cmd, data))
         for bank in range(self._num_banks):

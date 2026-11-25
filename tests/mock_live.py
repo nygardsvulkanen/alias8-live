@@ -142,8 +142,48 @@ class SessionComponent(object):
         self._offset = t
 
 
+class FakeAlias8(object):
+    """Answers the script's questions like an Alias 8: 'request setting <cmd>' -> the setting; a setting
+    message changes it. relative=True: the encoder's CC mode is relative. answers=False: never answers.
+    drop={cmd: n}: ignore the first n questions about cmd. delay=True: answers wait for deliver()."""
+    HEADER = (240, 0, 1, 97, 11)
+
+    def __init__(self, relative=False, answers=True, drop=None, delay=False, settings=None):
+        self.settings = {34: (0, 7, 6, 5, 1, 4, 3, 2), 16: (126, 1, 42, 1, 43, 1, 44, 1),
+                         17: (2, 0) if relative else (0, 0)}
+        self.settings.update(settings or {})
+        self.answers, self.drop, self.delay = answers, dict(drop or {}), delay
+        self.pending = []
+        self.surface = None
+
+    def receive(self, data):
+        if data[:5] != self.HEADER or len(data) < 7:
+            return
+        cmd = data[5]
+        if cmd == 7:                                   # a question
+            asked = data[6]
+            if not self.answers or asked not in self.settings:
+                return
+            if self.drop.get(asked, 0) > 0:
+                self.drop[asked] -= 1
+                return
+            reply = self.HEADER + (asked,) + tuple(self.settings[asked]) + (247,)
+            if self.delay:
+                self.pending.append(reply)
+            else:
+                self.surface.handle_sysex(reply)
+        elif cmd in self.settings:                     # a setting
+            self.settings[cmd] = tuple(data[6:-1])
+
+    def deliver(self):
+        replies, self.pending = self.pending, []
+        for r in replies:
+            self.surface.handle_sysex(r)
+
+
 class ControlSurface(object):
     _song = None
+    device = None
 
     def __init__(self, c_instance):
         self.messages = []
@@ -175,6 +215,8 @@ class ControlSurface(object):
     def _send_midi(self, data):
         self.midi_out.append(tuple(data))
         LOG.append(("midi", tuple(data)))
+        if self.device is not None:
+            self.device.receive(tuple(data))
 
     def set_highlighting_session_component(self, s):
         self.highlight = s

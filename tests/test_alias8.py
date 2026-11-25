@@ -14,7 +14,7 @@ import mock_live  # noqa: E402
 RED_TRACK, GREEN_TRACK, GREY_TRACK = 0xE0201B, 0x3DC300, 0x888888
 
 
-def make(n_tracks=10, page_order=None):
+def make(n_tracks=10, page_order=None, device=None):
     tracks = [mock_live.Track("T%d" % (i + 1), (RED_TRACK, GREEN_TRACK, GREY_TRACK)[i % 3]) for i in range(n_tracks)]
     song = mock_live.Song(tracks)
     mock_live.install(song)
@@ -22,9 +22,10 @@ def make(n_tracks=10, page_order=None):
         del sys.modules[m]
     from Alias8 import create_instance, settings
     from Alias8 import Alias8 as mod
-    if page_order is not None:
-        settings.PAGE_ORDER = page_order
+    settings.PAGE_ORDER = page_order if page_order is not None else ("sends", "pan", "macros")   # not the user's file
     s = create_instance(None)
+    s.device = device if device is not None else mock_live.FakeAlias8()
+    s.device.surface = s
     s.run_scheduled()
     return s, song, tracks, sys.modules["Alias8.Alias8"]
 
@@ -169,8 +170,7 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(s._session.track_offset(), 1)      # already inside: the box stays
 
     def test_encoder_scrolls_the_box(self):
-        s, song, tracks, mod = make(n_tracks=20)
-        s.handle_sysex(RELATIVE)
+        s, song, tracks, mod = make(n_tracks=20, device=mock_live.FakeAlias8(relative=True))
         s._encoders[0].receive(1)                 # one click forward (two's complement)
         self.assertEqual(s._session.track_offset(), 1)
         s._encoders[4].receive(65)                # offset-64 format, on bank 5's channel
@@ -182,8 +182,7 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(song.view.selected_track, tracks[1])   # the columns follow the box
 
     def test_encoder_stops_at_the_ends(self):
-        s, song, tracks, mod = make(n_tracks=10)
-        s.handle_sysex(RELATIVE)
+        s, song, tracks, mod = make(n_tracks=10, device=mock_live.FakeAlias8(relative=True))
         s._encoders[0].receive(127)
         self.assertEqual(s._session.track_offset(), 0)
         for _ in range(5):
@@ -191,8 +190,7 @@ class TestAlias8(unittest.TestCase):
         self.assertEqual(s._session.track_offset(), 2)        # 10 tracks: the last box is tracks 3-10
 
     def test_scrolling_isnt_undone_by_the_selection(self):
-        s, song, tracks, mod = make(n_tracks=20)
-        s.handle_sysex(RELATIVE)
+        s, song, tracks, mod = make(n_tracks=20, device=mock_live.FakeAlias8(relative=True))
         song.view.selected_track = tracks[0]
         s.update_display()
         for _ in range(9):
@@ -202,8 +200,7 @@ class TestAlias8(unittest.TestCase):
 
     def test_scrolling_past_the_selected_track_with_live_wrappers(self):
         # Live returns a new object for selected_track on every read: the box must not snap back to it
-        s, song, tracks, mod = make(n_tracks=20)
-        s.handle_sysex(RELATIVE)
+        s, song, tracks, mod = make(n_tracks=20, device=mock_live.FakeAlias8(relative=True))
         song.view.wrap = True
         song.view.selected_track = tracks[0]
         s.update_display()
@@ -305,34 +302,88 @@ class TestAlias8(unittest.TestCase):
         self.assertIsNone(p.feed(100.0, 0, 127, 11))       # someone moved it to 100: wait for the knob
 
     # ---------------------------------------------------------------- controller setup
-    def test_asks_for_the_settings_it_needs(self):
-        s, song, tracks, mod = make()
-        self.assertIn((240, 0, 1, 97, 11, 7, 34, 247), s.midi_out)
-        self.assertIn((240, 0, 1, 97, 11, 7, 17, 247), s.midi_out)
-        self.assertIn((240, 0, 1, 97, 11, 7, 16, 247), s.midi_out)
+    MAP_SCRIPT = (0, 1, 2, 3, 4, 5, 6, 7)
+    MAP_FACTORY = (0, 7, 6, 5, 1, 4, 3, 2)
+
+    def test_asks_one_setting_at_a_time_colour_map_first(self):
+        dev = mock_live.FakeAlias8(delay=True)
+        s, song, tracks, mod = make(device=dev)
+        reqs = [m for m in s.midi_out if m[5:6] == (7,)]
+        self.assertEqual(reqs, [(240, 0, 1, 97, 11, 7, 34, 247)])         # only the first question so far
+        self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])      # no light before the colour map
+        dev.deliver()                                                       # colour map answered
+        self.assertEqual(dev.settings[34], self.MAP_SCRIPT)
+        self.assertTrue([e for e in mock_live.LOG if e[0] == "led"])
+        self.assertEqual([m for m in s.midi_out if m[5:6] == (7,)][-1], (240, 0, 1, 97, 11, 7, 16, 247))
+        dev.deliver()
+        self.assertEqual([m for m in s.midi_out if m[5:6] == (7,)][-1], (240, 0, 1, 97, 11, 7, 17, 247))
+        dev.deliver()
+        self.assertEqual(s.midi_out[-1], (240, 0, 1, 97, 11, 26, 0, 247))   # done: bank 1
 
     def test_factory_controller_gets_the_colour_map_only(self):
-        s, song, tracks, mod = make()
-        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)   # sent at start
-        s.midi_out = []
-        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # factory answers
-        s.handle_sysex(ABSOLUTE)
-        s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 42, 1, 43, 1, 44, 1, 247))
-        self.assertEqual(s.midi_out, [])                                       # encoder untouched
-        s.disconnect()                                                         # put the colours back
-        self.assertEqual([m for m in s.midi_out if m[:5] == (240, 0, 1, 97, 11)],
-                         [(240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247)])
+        dev = mock_live.FakeAlias8()
+        s, song, tracks, mod = make(device=dev)
+        self.assertEqual(dev.settings[34], self.MAP_SCRIPT)
+        self.assertEqual(dev.settings[17], (0, 0))                          # encoder untouched
+        self.assertFalse([m for m in s.midi_out if m[:6] in ((240, 0, 1, 97, 11, 16), (240, 0, 1, 97, 11, 17))])
+        s.disconnect()
+        self.assertEqual(dev.settings[34], self.MAP_FACTORY)                # colours back
 
-    def test_colour_map_is_sent_before_any_light(self):
-        s, song, tracks, mod = make()
-        for _ in range(3):
+    def test_colour_map_is_restored_even_if_the_first_question_is_lost(self):
+        dev = mock_live.FakeAlias8(drop={34: 1})
+        s, song, tracks, mod = make(device=dev)
+        for _ in range(20):
+            s.update_display()                                             # waits, then asks again
+        self.assertEqual(dev.settings[34], self.MAP_SCRIPT)
+        s.disconnect()
+        self.assertEqual(dev.settings[34], self.MAP_FACTORY)
+
+    def test_already_set_up_controller_is_left_alone(self):
+        dev = mock_live.FakeAlias8(relative=True, settings={34: (0, 1, 2, 3, 4, 5, 6, 7)})
+        s, song, tracks, mod = make(device=dev)
+        self.assertFalse([m for m in s.midi_out if m[:6] == (240, 0, 1, 97, 11, 34)])
+        s.disconnect()
+        self.assertFalse([m for m in s.midi_out if m[:6] == (240, 0, 1, 97, 11, 34)])
+
+    def test_absolute_encoder_scrolls_by_direction(self):
+        s, song, tracks, mod = make(n_tracks=20)            # factory: absolute
+        self.assertFalse(s._enc_relative)
+        for v in (64, 72, 80, 88):          # turning forward, 8 per click (factory speed)
+            s._encoders[0].receive(v)
+        self.assertEqual(s._session.track_offset(), 3)       # the first value only sets the start
+        s._encoders[0].receive(80)
+        self.assertEqual(s._session.track_offset(), 2)
+        s._encoders[0].receive(80)                            # no change: nothing
+        self.assertEqual(s._session.track_offset(), 2)
+
+    def test_encoder_cc_comes_from_the_controller(self):
+        dev = mock_live.FakeAlias8(relative=True, settings={16: (126, 1, 50, 1, 43, 1, 44, 1)})
+        s, song, tracks, mod = make(n_tracks=20, device=dev)
+        self.assertEqual(s._encoders[0].args[2], 50)
+        s._encoders[3].receive(1)
+        self.assertEqual(s._session.track_offset(), 1)
+
+    def test_no_answer_assumes_factory(self):
+        s, song, tracks, mod = make(n_tracks=20, device=mock_live.FakeAlias8(answers=False))
+        self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])
+        for _ in range(200):
             s.update_display()
-        kinds = [e[0] for e in mock_live.LOG]
-        first_led = kinds.index("led")
-        sent_map = mock_live.LOG.index(("midi", (240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247)))
-        asked = mock_live.LOG.index(("midi", (240, 0, 1, 97, 11, 7, 34, 247)))
-        self.assertLess(asked, sent_map)          # ask first, so the answer is still the controller's own map
-        self.assertLess(sent_map, first_led)
+        self.assertIn((240, 0, 1, 97, 11, 34) + self.MAP_SCRIPT + (247,), s.midi_out)   # sent anyway
+        self.assertTrue([e for e in mock_live.LOG if e[0] == "led"])
+        self.assertFalse(s._enc_relative)                     # factory: absolute, CC 42
+        self.assertEqual(s._enc_cc, 42)
+        self.assertIn((240, 0, 1, 97, 11, 26, 0, 247), s.midi_out)
+        s.midi_out = []
+        s.disconnect()                                        # their map is unknown: nothing to put back
+        self.assertFalse([m for m in s.midi_out if m[:6] == (240, 0, 1, 97, 11, 34)])
+
+    def test_later_settings_messages_are_ignored(self):
+        s, song, tracks, mod = make(device=mock_live.FakeAlias8(relative=True))
+        s.midi_out = []
+        s.handle_sysex((240, 0, 1, 97, 11, 34) + self.MAP_FACTORY + (247,))   # e.g. the editor reading it later
+        s.handle_sysex(ABSOLUTE)
+        self.assertEqual(s.midi_out, [])
+        self.assertTrue(s._enc_relative)
 
     def test_no_lights_before_start(self):
         tracks = [mock_live.Track("T1")]
@@ -344,65 +395,6 @@ class TestAlias8(unittest.TestCase):
         s.update_display()                        # Live may refresh before the scheduled start
         self.assertFalse([e for e in mock_live.LOG if e[0] == "led"])
 
-    def test_already_set_up_controller_is_left_alone(self):
-        s, song, tracks, mod = make()
-        s.midi_out = []
-        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247))   # set up by the editor wizard
-        s.handle_sysex(RELATIVE)
-        self.assertEqual(s.midi_out, [])
-        s.disconnect()
-        self.assertFalse([m for m in s.midi_out if m[:5] == (240, 0, 1, 97, 11)])
-
-    def test_never_changes_the_encoder(self):
-        s, song, tracks, mod = make()
-        for msg in (ABSOLUTE, RELATIVE, (240, 0, 1, 97, 11, 16, 126, 1, 50, 1, 43, 1, 44, 1, 247)):
-            s.handle_sysex(msg)
-        for _ in range(25):
-            s.update_display()
-        s.disconnect()
-        self.assertFalse([m for m in s.midi_out if m[:6] in ((240, 0, 1, 97, 11, 16), (240, 0, 1, 97, 11, 17))])
-
-    def test_absolute_encoder_scrolls_by_direction(self):
-        s, song, tracks, mod = make(n_tracks=20)
-        s.handle_sysex(ABSOLUTE)
-        for v in (64, 72, 80, 88):          # turning forward, 8 per click (factory speed)
-            s._encoders[0].receive(v)
-        self.assertEqual(s._session.track_offset(), 3)       # the first value only sets the start
-        s._encoders[0].receive(80)
-        self.assertEqual(s._session.track_offset(), 2)
-        s._encoders[0].receive(80)                            # no change: nothing
-        self.assertEqual(s._session.track_offset(), 2)
-
-    def test_encoder_cc_comes_from_the_controller(self):
-        s, song, tracks, mod = make(n_tracks=20)
-        s.handle_sysex(RELATIVE)
-        s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 50, 1, 43, 1, 44, 1, 247))   # CC mode on CC 50
-        self.assertEqual(s._encoders[0].args[2], 50)
-        s._encoders[3].receive(1)
-        self.assertEqual(s._session.track_offset(), 1)
-
-    def test_no_answer_assumes_factory(self):
-        s, song, tracks, mod = make(n_tracks=20)
-        self.assertIn((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247), s.midi_out)
-        for _ in range(25):
-            s.update_display()
-        self.assertFalse(s._enc_relative)                     # factory: absolute, CC 42
-        self.assertEqual(s._enc_cc, 42)
-        s.midi_out = []
-        s.disconnect()                                        # their map is unknown: nothing to put back
-        self.assertFalse([m for m in s.midi_out if m[:6] == (240, 0, 1, 97, 11, 34)])
-
-    def test_later_settings_messages_are_ignored(self):
-        s, song, tracks, mod = make()
-        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 1, 2, 3, 4, 5, 6, 7, 247))
-        s.handle_sysex(RELATIVE)
-        s.handle_sysex((240, 0, 1, 97, 11, 16, 126, 1, 42, 1, 43, 1, 44, 1, 247))
-        s.midi_out = []
-        s.handle_sysex((240, 0, 1, 97, 11, 34, 0, 7, 6, 5, 1, 4, 3, 2, 247))   # e.g. the editor reading it later
-        s.handle_sysex(ABSOLUTE)
-        self.assertEqual(s.midi_out, [])
-        self.assertTrue(s._enc_relative)
-
     def test_ack_is_quiet(self):
         s, song, tracks, mod = make()
         s.midi_out = []
@@ -412,6 +404,13 @@ class TestAlias8(unittest.TestCase):
     def test_debug_is_off_by_default(self):
         from Alias8 import settings
         self.assertFalse(settings.DEBUG)
+
+    def test_never_changes_the_encoder(self):
+        s, song, tracks, mod = make()
+        for _ in range(25):
+            s.update_display()
+        s.disconnect()
+        self.assertFalse([m for m in s.midi_out if m[:6] in ((240, 0, 1, 97, 11, 16), (240, 0, 1, 97, 11, 17))])
 
     # ---------------------------------------------------------------- PAGE_ORDER
     def test_page_order_macros_first(self):
