@@ -347,9 +347,9 @@ class TestAlias8(unittest.TestCase):
         s.midi_out = []
         s.disconnect()
         from Alias8.colors import RED
-        self.assertEqual(s._btn_top[0][0].sent[-1], RED)                   # as a LED note, not sysex
-        self.assertEqual([s._btn_top[0][i].sent[-1] for i in range(1, 8)], [0] * 7)
-        self.assertEqual(s._btn_bottom[1][3].sent[-1], 0)
+        self.assertEqual(dev.leds[(0, 0)], RED)                            # as a LED note, not sysex
+        self.assertEqual([dev.leds[(0, i)] for i in range(1, 8)], [0] * 7)
+        self.assertEqual(dev.leds[(1, 11)], 0)
         self.assertEqual(dev.settings[26], (4,))                            # back to bank 5
         self.assertFalse([m for m in s.midi_out if m[5:6] in ((4,), (37,))])   # no LED sysex burst
 
@@ -360,9 +360,20 @@ class TestAlias8(unittest.TestCase):
         for _ in range(20):
             s.update_display()
         s.disconnect()
-        self.assertEqual(s._btn_top[0][0].sent[-1], 4)                     # green with the script's map
-        self.assertEqual(s._btn_top[0][1].sent[-1], 1)                     # red
+        self.assertEqual(dev.leds[(0, 0)], 4)                              # green with the script's map
+        self.assertEqual(dev.leds[(0, 1)], 1)                              # red
         self.assertEqual(dev.settings[34], (0, 7, 6, 5, 1, 4, 3, 2))       # factory map back afterwards
+
+    def test_colours_go_out_after_live_turns_the_buttons_off(self):
+        dev = mock_live.FakeAlias8()
+        s, song, tracks, mod = make(device=dev)
+        order = []
+        real_send = s._c_instance.send_midi
+        s._c_instance.send_midi = lambda d: (order.append(s.disconnected), real_send(d))
+        s.disconnect()
+        self.assertTrue(order and all(order))                              # only after the framework let go
+        from Alias8.colors import RED
+        self.assertEqual(dev.leds[(0, 0)], RED)
 
     def test_decode_leds(self):
         from Alias8.controller import decode_leds
@@ -512,8 +523,9 @@ class TestAlias8(unittest.TestCase):
         for _ in range(400):
             s.update_display()
         s.disconnect()
-        self.assertEqual(s._btn_top[0][0].sent[-1], 0)
-        self.assertEqual(s._btn_bottom[2][7].sent[-1], 0)
+        self.assertEqual(dev.leds[(0, 0)], 0)
+        self.assertEqual(dev.leds[(2, 15)], 0)
+        self.assertIn((0x90, 0, 0), s.midi_out)                            # sent by the script too
 
 
 class TestColours(unittest.TestCase):

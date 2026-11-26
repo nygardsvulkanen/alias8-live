@@ -153,14 +153,15 @@ class FakeAlias8(object):
                          17: (2, 0) if relative else (0, 0), 26: (0,),
                          4: (1, 0, 0, 0, 0, 0, 0, 0),           # button 1 saved red, the rest off
                          37: (1,) + (0,) * 119}                 # all banks (the real Alias 8 may not answer)
-        self.leds_from_notes = 0                                # LED messages received (notes)
+        self.leds = {}                                          # (channel, note) -> velocity of LED notes
         self.settings.update(settings or {})
         self.answers, self.drop, self.delay = answers, dict(drop or {}), delay
         self.pending = []
         self.surface = None
 
     def receive(self, data):
-        if data[0] & 0xF0 in (0x90, 0x80):            # (not used: the fake elements don't send MIDI)
+        if data[0] & 0xF0 in (0x90, 0x80):            # an LED note
+            self.leds[(data[0] & 15, data[1])] = data[2] if data[0] & 0xF0 == 0x90 else 0
             return
         if data[:5] != self.HEADER or len(data) < 7:
             return
@@ -186,11 +187,22 @@ class FakeAlias8(object):
             self.surface.handle_sysex(r)
 
 
+class CInstance(object):
+    """Live's c_instance: send_midi goes straight to the controller."""
+    def __init__(self, surface):
+        self.surface = surface
+
+    def send_midi(self, data):
+        ControlSurface._send_midi(self.surface, data)
+
+
 class ControlSurface(object):
     _song = None
     device = None
 
     def __init__(self, c_instance):
+        self._c_instance = CInstance(self)
+        self.disconnected = False
         self.messages = []
         self.midi_out = []
         self.scheduled = []
@@ -233,7 +245,14 @@ class ControlSurface(object):
         pass
 
     def disconnect(self):
-        pass
+        """Like Live: the framework turns the buttons' LEDs off while it disconnects the script."""
+        self.disconnected = True
+        if self.device is not None:
+            for key in list(self.device.leds):
+                self.device.leds[key] = 0
+            for ch in range(16):
+                for note in range(16):
+                    self.device.leds[(ch, note)] = 0
 
 
 def install(song):

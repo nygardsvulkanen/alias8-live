@@ -431,26 +431,35 @@ class Alias8(ControlSurface):
 
     def disconnect(self):
         """Leave the Alias 8 as we found it: its buttons' own colours, its colour map and its bank.
-        The colours go out as ordinary LED notes (sysex sent in a burst at shutdown gets lost), computed
-        for the colour map that is active right now; the controller keeps them when the map changes back."""
+        Live's framework turns the buttons off while it disconnects the script, so everything goes out
+        afterwards, straight to the controller. The colours go out as ordinary LED notes (sysex sent in a
+        burst at shutdown gets lost), computed for the colour map that is active right now; the controller
+        keeps them when the map changes back."""
         back = dict(self._original)
         back.update(self._saved)
         self._debug("disconnect: putting back %s" % (back or "nothing (unknown)"))
+        out = []
         active_map = controller.SCRIPT_COLOR_MAP if self._ready else self._original.get(
             controller.COLOR_MAP, controller.SCRIPT_COLOR_MAP)
         for bank in range(self._num_banks):
             colours = controller.bank_leds(self._saved, bank)
             for i in range(NUM_TRACKS):
-                for row, buttons in ((0, self._btn_top), (1, self._btn_bottom)):
+                for row, note in ((0, BUTTON_TOP_NOTE + i), (1, BUTTON_BOTTOM_NOTE + i)):
                     vel = OFF
                     if colours is not None:
                         vel = controller.velocity_for(colours[row * NUM_TRACKS + i], active_map)
                         if vel is None:
                             vel = OFF                  # that colour isn't in the map: dark
-                    buttons[bank][i].send_value(vel, True)
+                    out.append((0x90 | bank, note, vel))
         for cmd, data in self._original.items():       # the colour map
-            self._send_midi(controller.message(cmd, data))
+            out.append(controller.message(cmd, data))
         saved_bank = self._saved.get(controller.CURRENT_BANK)
         if saved_bank and tuple(saved_bank)[:1] != (self._bank,):
-            self._send_midi(controller.message(controller.CURRENT_BANK, saved_bank))   # back to its bank
+            out.append(controller.message(controller.CURRENT_BANK, saved_bank))   # back to its bank
+        c_instance = getattr(self, "_c_instance", None)
         ControlSurface.disconnect(self)
+        for msg in out:
+            if c_instance is not None:
+                c_instance.send_midi(tuple(msg))
+            else:
+                self._send_midi(msg)
