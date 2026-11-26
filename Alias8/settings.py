@@ -16,10 +16,10 @@
 #
 # Bank 1 is the first page in the list, bank 2 the second, and so on. Reorder them, leave one out, or use
 # one twice – up to 15 banks. Examples:
-#   PAGE_ORDER = ("macros", "sends", "pan")      macros on bank 1
-#   PAGE_ORDER = ("sends", "macros")             only two banks
+#   PAGE_ORDER = ("sends", "pan", "macros")      add pan on bank 2
+#   PAGE_ORDER = ("macros", "sends")             macros on bank 1
 # -----------------------------------------------------------------------------------------------------
-PAGE_ORDER = ("sends", "pan", "macros")
+PAGE_ORDER = ("sends", "macros")
 
 # "sends" page: which sends the two knob rows control (1 = Send A, 2 = Send B ...).
 SENDS_PAGE = (1, 2)

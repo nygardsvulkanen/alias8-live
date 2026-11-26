@@ -20,3 +20,4 @@
 - 2026-11-26: The buttons' own colours went dark anyway when Live closed: Live's framework turns the LEDs off while it disconnects the script. The colours, colour map and bank now go out after that, straight to the controller. 55 tests. Not yet tried on hardware.
 - 2026-11-26: Confirmed on Daniel's Alias 8: a button saved red in the editor is red again after switching Control Surface to None.
 - 2026-11-26: v1.0: README rewritten for users (installation, settings, what the script does to the controller, known limitations; tested on macOS + Live 12.4). Release zip on GitHub.
+- 2026-11-26: v1.0.1: the default PAGE_ORDER is now sends, macros (two banks). Pan / Send C is an optional page, because a new Live set has only returns A and B. 56 tests.

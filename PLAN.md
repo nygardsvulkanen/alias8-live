@@ -11,7 +11,7 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
   - top buttons: tap = select track (track colour, the selected track blinks), hold = arm (alternates with red)
   - bottom buttons: tap = mute (dark when muted), hold = solo (blue)
   - faders = track volume, master fader = master volume
-- **Knobs per bank:** bank 1 sends A/B · bank 2 pan / send C · bank 3 selected track's rack macros 1–8 / 9–16 (pickup).
+- **Knobs per bank:** bank 1 sends A/B · bank 2 pan / send C · bank 3 selected track's rack macros 1–8 / 9–16 (pickup). **Changed 2026-11-26 (v1.0.1):** the default is bank 1 sends, bank 2 macros; pan is an optional page (`PAGE_ORDER`), because a new Live set has no Send C.
 - **Encoder:** bank mode by default (turn = bank, factory behaviour, display shows the bank). Pressing the encoder toggles the Alias 8 into CC mode: turn = scroll Live's session box (8 tracks) one track at a time. Press again = back to bank mode.
 - **Zero configuration:** works on factory settings. On connect the script sends temporary sysex (not saved): local LED control off for buttons, "any channel" off, the colour map, and the encoder's CC-mode slot (CC 42, relative). Same commands the Livid editor's wizard sends; never "save to device".
 

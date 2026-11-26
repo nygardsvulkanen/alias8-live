@@ -4,7 +4,7 @@
 #   top buttons     tap = select the track, hold = arm
 #   bottom buttons  tap = mute, hold = solo
 #   faders          track volume; master fader = master volume
-#   knobs           per bank, in the order of PAGE_ORDER in settings.py (default: sends, pan, macros):
+#   knobs           per bank, in the order of PAGE_ORDER in settings.py (default: sends, macros):
 #     "sends"       Send A (top row) / Send B (bottom row)      (SENDS_PAGE)
 #     "pan"         pan / Send C                                (PAN_PAGE_SEND)
 #     "macros"      macros 1-8 / 9-16 of the selected track's first rack, with pickup (MACRO_PICKUP)

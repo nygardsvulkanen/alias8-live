@@ -2,7 +2,7 @@
 
 SENDS, PAN, MACROS = "sends", "pan", "macros"
 PAGE_NAMES = (SENDS, PAN, MACROS)
-DEFAULT_ORDER = (SENDS, PAN, MACROS)
+DEFAULT_ORDER = (SENDS, MACROS)
 MAX_BANKS = 15
 
 TITLES = {SENDS: "sends", PAN: "pan / send", MACROS: "rack macros"}

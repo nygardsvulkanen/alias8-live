@@ -1,6 +1,6 @@
 # Alias8 – Ableton Live script for the Livid Alias 8
 
-A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller. It puts track colours on the buttons and gives you select, arm, mute, solo, volume, sends, pan and the selected track's rack macros. No editor setup is needed, and there are no naming rules for tracks or racks.
+A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller. It puts track colours on the buttons and gives you select, arm, mute, solo, volume, sends and the selected track's rack macros (and pan, if you want it). No editor setup is needed, and there are no naming rules for tracks or racks.
 
 Ableton Live doesn't ship a script for the Alias 8, so this fills the gap. (Looking for the author's full setup, with rack conventions and the big-text [Scribble Strip](https://github.com/nygardsvulkanen/scribble-strip) display? That's [alias8-scribble](https://github.com/nygardsvulkanen/alias8-scribble).)
 
@@ -26,10 +26,12 @@ The buttons and faders do the same thing on every bank, so they stay in muscle m
 | Faders | Track volume |
 | Master fader | Master volume |
 
-| | Bank 1 · `sends` | Bank 2 · `pan` | Bank 3 · `macros` |
-|---|---|---|---|
-| Top knobs | Send A | Pan | Selected track's macros 1–8 |
-| Bottom knobs | Send B | Send C | Selected track's macros 9–16 |
+| | Bank 1 · `sends` | Bank 2 · `macros` |
+|---|---|---|
+| Top knobs | Send A | Selected track's macros 1–8 |
+| Bottom knobs | Send B | Selected track's macros 9–16 |
+
+A third page, `pan`, is available but off by default. On it the top knobs control pan and the bottom knobs Send C. A new Live set has only two return tracks, so Send C would do nothing there. To add the page, see Settings below.
 
 **Encoder:**
 - Turn it to change bank. The display shows the bank.
@@ -50,7 +52,7 @@ Macros use pickup: a macro only moves once the knob reaches the macro's current 
 
 Everything works without changes. To adjust something, edit `Alias8/settings.py` and restart Live, or switch Control Surface to None and back.
 
-- `PAGE_ORDER` sets which page is on which bank. You can reorder the pages, leave one out or use one twice, up to 15 banks. For example: `PAGE_ORDER = ("macros", "sends", "pan")`.
+- `PAGE_ORDER` sets which page is on which bank. You can reorder the pages, leave one out or use one twice, up to 15 banks. For example, `PAGE_ORDER = ("sends", "pan", "macros")` adds the pan page on bank 2.
 - `SENDS_PAGE` and `PAN_PAGE_SEND` set which sends the pages use.
 - Other settings: the hold time, macro pickup, whether the box follows the selection, the scroll step and blinking.
 

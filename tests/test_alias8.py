@@ -509,7 +509,11 @@ class TestAlias8(unittest.TestCase):
 
     def test_page_order_empty_falls_back(self):
         s, song, tracks, mod = make(page_order=())
-        self.assertEqual(s._pages, ("sends", "pan", "macros"))
+        self.assertEqual(s._pages, ("sends", "macros"))
+
+    def test_default_is_sends_and_macros(self):
+        from Alias8.pages import DEFAULT_ORDER
+        self.assertEqual(DEFAULT_ORDER, ("sends", "macros"))   # works in a new Live set (only returns A and B)
 
     def test_page_order_at_most_15(self):
         from Alias8.pages import page_order
