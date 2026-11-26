@@ -1,12 +1,21 @@
 # Alias8 – Ableton Live script for the Livid Alias 8
 
-**Work in progress.** Banks 1–3, the buttons, lights and encoder scrolling are written and tested against a simulated Live; encoder scrolling is confirmed on a real Alias 8. Zero configuration is confirmed on a factory-reset Alias 8. Still to come: a picture of the layout and a download (phase 4). See `PLAN.md`.
+A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller. It puts track colours on the buttons and gives you select, arm, mute, solo, volume, sends, pan and the selected track's rack macros. No editor setup is needed, and there are no naming rules for tracks or racks.
 
-A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller: track colours on the buttons, select, arm, mute, solo, volume, sends, pan and the selected track's rack macros. No editor setup needed, no naming rules for tracks or racks.
+Ableton Live doesn't ship a script for the Alias 8, so this fills the gap. (Looking for the author's full setup, with rack conventions and the big-text [Scribble Strip](https://github.com/nygardsvulkanen/scribble-strip) display? That's [alias8-scribble](https://github.com/nygardsvulkanen/alias8-scribble).)
 
-Ableton Live doesn't ship a script for the Alias 8, so this fills the gap. (Looking for the author's full setup with rack conventions and the big-text [Scribble Strip](https://github.com/nygardsvulkanen/scribble-strip) display? That's [alias8-scribble](https://github.com/nygardsvulkanen/alias8-scribble).)
+Tested on macOS with Ableton Live 12.4 and an Alias 8 on factory settings.
 
-## Planned layout
+## Installation
+
+1. Download `Alias8-v1.0.zip` from [Releases](https://github.com/nygardsvulkanen/alias8-live/releases) and unzip it.
+2. Copy the `Alias8` folder into your Remote Scripts folder:
+   - macOS: `~/Music/Ableton/User Library/Remote Scripts/`
+   - Windows: `Documents\Ableton\User Library\Remote Scripts\`
+3. Restart Live.
+4. Open **Settings → Link, Tempo & MIDI** and set **Control Surface** to **Alias8**, **Input** to **Alias 8** and **Output** to **Alias 8**.
+
+## Layout
 
 The buttons and faders do the same thing on every bank, so they stay in muscle memory. Only the knobs change.
 
@@ -22,18 +31,47 @@ The buttons and faders do the same thing on every bank, so they stay in muscle m
 | Top knobs | Send A | Pan | Selected track's macros 1–8 |
 | Bottom knobs | Send B | Send C | Selected track's macros 9–16 |
 
-**Encoder:** turn it to change bank (the display shows the bank). Press it to switch the Alias 8 to CC mode: turning then moves Live's coloured box – which 8 tracks the Alias 8 controls – one track at a time. Press again to go back to changing banks. The script follows your Alias 8's own encoder settings and never changes them: it reads which CC the encoder sends and whether it is absolute (factory) or relative. Absolute stops scrolling when the encoder reaches its end of 0–127 – at the factory speed (8 per click) that is 16 clicks from end to end, so turn back a little if you need to go further. For endless scrolling, set the encoder to *relative* in the Livid editor; a lower *Speed A* gives more clicks in absolute mode. The box also follows when you select a track outside it in Live.
+**Encoder:**
+- Turn it to change bank. The display shows the bank.
+- Press it to switch the Alias 8 to CC mode. Turning it then moves Live's coloured box, which shows the 8 tracks the Alias 8 controls, one track at a time.
+- Press it again to go back to changing banks.
 
-That's the default order. To change it, edit `PAGE_ORDER` at the top of `Alias8/settings.py` – reorder the pages, leave one out or use one twice (up to 15 banks), e.g. `PAGE_ORDER = ("macros", "sends", "pan")`. The same section sets which sends the `sends` and `pan` pages use.
+The box also follows when you select a track outside it in Live.
 
-Track colours are rounded to the nearest of the Alias 8's seven colours (red, green, yellow, blue, pink, cyan, white). The `macros` page controls the macros of the selected track's first rack (an Instrument, Drum or Audio Effect Rack; a MIDI Effect Rack only if there is no other). Macros with nothing mapped to them are skipped. Macros use pickup: a macro only moves once the knob reaches its current value, so nothing jumps – the status bar says "turn to pick up" until then.
+The script follows your Alias 8's own encoder settings and never changes them. It reads which CC the encoder sends in CC mode, and whether that CC is absolute (the factory setting) or relative.
 
-## Planned installation
+**Track colours** are rounded to the nearest of the Alias 8's seven colours: red, green, yellow, blue, pink, cyan and white.
 
-1. Download the `Alias8` folder and copy it into `~/Music/Ableton/User Library/Remote Scripts/` (Windows: `Documents\Ableton\User Library\Remote Scripts\`).
-2. Restart Live, open **Settings → Link, Tempo & MIDI**, and pick **Control Surface: Alias8**, **Input: Alias 8**, **Output: Alias 8**.
+**Macros:** the `macros` page controls the macros of the selected track's first rack. That can be an Instrument, Drum or Audio Effect Rack, and a MIDI Effect Rack only if the track has no other. Macros with nothing mapped to them are skipped.
 
-Works with the Alias 8's factory settings. When Live starts, the script reads a few of the controller's settings. The only one it changes is the colour map, so track colours come out right – nothing is saved in the controller. When the script stops it puts back the original colour map, the bank the Alias 8 was on and the buttons' own colours, so the controller looks as it did before Live started. The encoder settings are left exactly as you set them.
+Macros use pickup: a macro only moves once the knob reaches the macro's current value, so nothing jumps. Until then the status bar says "turn to pick up".
+
+## Settings
+
+Everything works without changes. To adjust something, edit `Alias8/settings.py` and restart Live, or switch Control Surface to None and back.
+
+- `PAGE_ORDER` sets which page is on which bank. You can reorder the pages, leave one out or use one twice, up to 15 banks. For example: `PAGE_ORDER = ("macros", "sends", "pan")`.
+- `SENDS_PAGE` and `PAN_PAGE_SEND` set which sends the pages use.
+- Other settings: the hold time, macro pickup, whether the box follows the selection, the scroll step and blinking.
+
+## What it does to your Alias 8
+
+When Live starts, the script reads a few of the controller's settings. The only one it changes is the colour map, so that track colours come out right.
+
+Nothing is saved in the controller: the script never sends "save to device".
+
+When the script stops (Live quits, or Control Surface is set to None), it puts back:
+- the original colour map,
+- the bank the Alias 8 was on,
+- the buttons' own colours.
+
+The controller then looks as it did before Live started. The encoder settings are left exactly as you set them.
+
+## Known limitations
+
+- **Absolute encoder:** with the factory encoder setting, scrolling stops when the encoder reaches the end of its 0–127 range. At the factory speed (8 per click) that is 16 clicks from end to end, so turn back a little if you need to go further. For endless scrolling, set the encoder's CC mode to *relative* in the Livid editor. A lower *Speed A* gives more clicks in absolute mode.
+- **Live crashes:** if Live crashes instead of quitting, the controller keeps the script's colour map until you unplug it. It is never saved, so unplugging restores yours.
+- **Windows:** not tested yet. It should work, because the script uses only Live's own Python API.
 
 ## License
 

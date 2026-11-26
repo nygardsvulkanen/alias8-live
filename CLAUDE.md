@@ -1,6 +1,6 @@
 # Alias8 – notes for Claude
 
-Simple, shareable Ableton Live 12 control surface script for the Livid Alias 8 (script folder `Alias8`). Work in progress – see `PLAN.md` for the decided layout and phases.
+Simple, shareable Ableton Live 12 control surface script for the Livid Alias 8 (script folder `Alias8`). Released as v1.0 (2026-11-26) – see `PLAN.md` for the decided layout and phases. Release zips are built with `git archive` (never from the working tree: Daniel's local `settings.py` differs).
 Owner: Daniel (writes in Swedish; answer in Swedish, keep code/comments/docs in English).
 
 ## Related repos (next to this one in ~/Developer)

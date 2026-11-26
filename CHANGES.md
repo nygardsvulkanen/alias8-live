@@ -19,3 +19,4 @@
 - 2026-11-25: Fix: the saved button colours still didn't come back – the sysex sent at shutdown was lost (the LED-off notes did arrive). Now the script decodes the saved colours (cmd 37 / cmd 4) and lights them with ordinary LED notes, the same way it shows track colours; then it puts back the colour map and the bank. 54 tests.
 - 2026-11-26: The buttons' own colours went dark anyway when Live closed: Live's framework turns the LEDs off while it disconnects the script. The colours, colour map and bank now go out after that, straight to the controller. 55 tests. Not yet tried on hardware.
 - 2026-11-26: Confirmed on Daniel's Alias 8: a button saved red in the editor is red again after switching Control Surface to None.
+- 2026-11-26: v1.0: README rewritten for users (installation, settings, what the script does to the controller, known limitations; tested on macOS + Live 12.4). Release zip on GitHub.

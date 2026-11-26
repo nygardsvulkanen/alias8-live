@@ -19,8 +19,8 @@ Plug in an Alias 8, pick "Alias8" in Live, done. A generic mixer controller anyo
 1. ✅ (2026-11-24, mock-tested) **Skeleton + bank 1:** `_Framework` ControlSurface with SessionComponent (red box, 8 tracks), MixerComponent (volume, sends, master), track colours → nearest Alias colour, select / mute with tap.
 2. ✅ (2026-11-24, confirmed on hardware) **Banks 2–3:** pan / send C, rack macros 1–16 with pickup (DeviceComponent or the first rack's macros).
 3. ✅ (2026-11-24, confirmed on a factory-reset Alias 8) **Zero config + lights:** connect-time sysex, bank detection (Alias bank sysex / MIDI channel), encoder press → scroll mode, LED polish (blink, dim).
-4. **Docs + release:** README with a labelled picture of the Alias 8, short `settings.py` (~10 options), MIT, CHANGES, a zip on GitHub Releases.
-5. **Hardware test with Daniel → v1.0.** Until then only tested with a mock Live.
+4. ✅ (2026-11-26, without the picture) **Docs + release:** README with a labelled picture of the Alias 8, short `settings.py` (~10 options), MIT, CHANGES, a zip on GitHub Releases.
+5. ✅ (2026-11-26) **Hardware test with Daniel → v1.0.** Released as v1.0 on GitHub (zip of the `Alias8` folder). A labelled picture of the layout is still optional.
 
 ## Reuse from alias8-scribble (copy, don't import)
 - `nearest_led_color` (logic.py) and the velocity → colour map (1 red, 4 green, 8 yellow, 16 blue, 32 pink, 64 cyan, 127 white).
