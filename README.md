@@ -8,7 +8,7 @@ Tested on macOS with Ableton Live 12.4 and an Alias 8 on factory settings.
 
 ## Installation
 
-1. Download `Alias8-v1.0.zip` from [Releases](https://github.com/nygardsvulkanen/alias8-live/releases) and unzip it.
+1. Download the latest `Alias8-v….zip` from [Releases](https://github.com/nygardsvulkanen/alias8-live/releases) and unzip it.
 2. Copy the `Alias8` folder into your Remote Scripts folder:
    - macOS: `~/Music/Ableton/User Library/Remote Scripts/`
    - Windows: `Documents\Ableton\User Library\Remote Scripts\`
