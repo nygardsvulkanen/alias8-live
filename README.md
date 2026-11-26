@@ -1,8 +1,10 @@
 # Alias8 – Ableton Live script for the Livid Alias 8
 
-A plug-and-play control surface script that turns a [Livid Alias 8](https://github.com/nygardsvulkanen/livid-editor) into a straightforward Ableton Live 12 mixer controller. It puts track colours on the buttons and gives you select, arm, mute, solo, volume, sends and the selected track's rack macros (and pan, if you want it). No editor setup is needed, and there are no naming rules for tracks or racks.
+A plug-and-play control surface script that turns a Livid Alias 8 into a straightforward Ableton Live 12 mixer controller. It puts track colours on the buttons and gives you select, arm, mute, solo, volume, sends and the selected track's rack macros (and pan, if you want it). No editor setup is needed, and there are no naming rules for tracks or racks.
 
-Ableton Live doesn't ship a script for the Alias 8, so this fills the gap. (Looking for the author's full setup, with rack conventions and the big-text [Scribble Strip](https://github.com/nygardsvulkanen/scribble-strip) display? That's [alias8-scribble](https://github.com/nygardsvulkanen/alias8-scribble).)
+Ableton Live doesn't ship a script for the Alias 8, so this fills the gap.
+
+Also check out my [Livid editor](https://github.com/nygardsvulkanen/livid-editor).
 
 Tested on macOS with Ableton Live 12.4 and an Alias 8 on factory settings.
 

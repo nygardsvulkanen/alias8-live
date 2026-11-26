@@ -21,3 +21,4 @@
 - 2026-11-26: Confirmed on Daniel's Alias 8: a button saved red in the editor is red again after switching Control Surface to None.
 - 2026-11-26: v1.0: README rewritten for users (installation, settings, what the script does to the controller, known limitations; tested on macOS + Live 12.4). Release zip on GitHub.
 - 2026-11-26: v1.0.1: the default PAGE_ORDER is now sends, macros (two banks). Pan / Send C is an optional page, because a new Live set has only returns A and B. 56 tests.
+- 2026-11-26: README: no links to Scribble Strip / alias8-scribble; the Livid editor gets its own line.
