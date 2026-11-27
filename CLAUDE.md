@@ -6,7 +6,7 @@ Owner: Daniel (writes in Swedish; answer in Swedish, keep code/comments/docs in 
 ## Related repos (next to this one in ~/Developer)
 - `alias8-scribble` – Daniel's full personal script (folder `Alias8_Live`, symlinked into Live's Remote Scripts) + Scribble Strip protocol. Reuse ideas and small helpers from it by copying; never import from it, and never touch Daniel's `Alias8_Live` setup.
 - `livid-editor` – the Livid editor; `app/js/wizard.js` has the exact sysex for controller setup.
-- `scribble-strip` – not used by this script.
+- `scribble-monitor` – not used by this script.
 
 ## Installed for Daniel
 `~/Music/Ableton/User Library/Remote Scripts/Alias8` is a symlink to `Alias8/` in this repo (his earlier copy is on the Desktop as `Alias8-copy-backup-2026-11-24`). Edits here are live after reloading the script in Live (Control Surface None → Alias8, or restart Live).
